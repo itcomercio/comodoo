@@ -1,0 +1,50 @@
+#!/bin/sh 
+
+#
+# We can't make loop mounting over Samba partition.
+#
+if [ $(stat $0 | awk '/Device/ { print $2 }') = "0,5" ] ; then
+    echo "Don't run $0 over smb!"
+    exit 1
+fi
+
+#
+# Only we can mount being superuser.
+#
+# [ `id -u` != "0" ] && echo "You must be root!" && exit
+
+welcome() {
+
+	echo 
+	echo "--------------------------------------------------"
+	echo "           Automatic Install Disk Utility         "
+	echo "                                                  "
+	echo " (c) 2008 Javi Roman <javiroman@redoop.org>  "
+	echo "                                                  "
+	echo "--------------------------------------------------"
+	echo
+
+	return
+}
+
+#
+# Local enviroment setting.
+#
+PATH=/sbin:$PATH
+export PATH
+
+welcome
+
+#
+# Making ramdisk image.
+#
+echo -e "<1> Making initrd image ...\n"
+(cd initrd_dir && find . | cpio  -o -c | gzip -9 > ../initrd.img)
+
+echo -e "<2> Installing initrd.img ...\n"
+cp -v initrd.img isolinux
+echo
+
+echo -e "<3> Installing isolinux ...\n"
+[ -e isolinux/isolinux.bin ] || cp -v /usr/lib/syslinux/isolinux.bin isolinux/
+

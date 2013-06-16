@@ -1,0 +1,72 @@
+#!/bin/sh 
+#
+# crea un rootfs en formato ext2 con SIZE y copia el contenido
+# del directorio initrd/ en dicha imagen, luego la comprime.
+
+PATH=/sbin:$PATH
+export PATH
+
+BASEDIR=initrd
+SIZE=14000
+MNTPOINT=/tmp/mkimage.mnt-$$
+IMAGE=initrd.img
+
+rm -f /tmp/$IMAGE
+
+dd if=/dev/zero of=/tmp/$IMAGE bs=1k count=$SIZE #2> /dev/null
+
+echo
+
+#
+# -F : 	Fuerza la creacion del sistema de archivos aunque no sea un dispositivo de bloques.
+# -i : 	Specify the bytes/inode ratio.  mke2fs creates an inode for every bytes-per-inode 
+#       bytes  of  space  on  the disk. This value generally shouldn't be smaller than 
+#		the blocksize of the filesystem.
+# -q :	quiet execution.
+# -m0:	Reservamos 0 bloques para el superusuario.
+#
+mke2fs -q -F -i 8096 -m0 /tmp/$IMAGE $SIZE > /dev/null #2> /dev/null
+
+mkdir -p $MNTPOINT
+
+mount -o loop -t ext2 /tmp/$IMAGE $MNTPOINT
+
+(cd $BASEDIR; find . | cpio --quiet -p $MNTPOINT)
+
+# (cd $BASEDIR; find . | grep -v "loader-" | cpio --quiet -p $MNTPOINT)
+# (cd $BASEDIR; find . -name $INCLUDELOADER | cpio --quiet -p $MNTPOINT)
+# (cd $TARGET; find . | cpio --quiet -pud $MNTPOINT)
+# (cd $MNTPOINT/bin; [ loader* != "loader" ] && mv loader* loader)
+
+#
+# Esto es solo para ponerlo bonito
+#
+echo -e "<2> initrd image $IMAGE:\n"
+
+sizeinitrd=`df $MNTPOINT | tr -s [:space:] | cut -d' ' -f2`
+echo -en "\tSize (1k-blocks): "
+echo $sizeinitrd | cut -d' ' -f2
+
+availinitrd=`df $MNTPOINT | tr -s [:space:] | cut -d' ' -f4`
+echo -en "\tFree            : "
+echo -en $availinitrd | cut -d' ' -f2 
+
+usedinitrd=`df $MNTPOINT | tr -s [:space:] | cut -d' ' -f3`
+echo -en "\tUsed            : "
+echo -en $(echo $usedinitrd | cut -d' ' -f2)
+
+echo -n " (" 
+percent=`df $MNTPOINT | tr -s [:space:] | cut -d' ' -f5`
+echo -en $(echo $percent | cut -d' ' -f2)
+echo -e ")\n"
+
+
+umount $MNTPOINT
+mv -f /tmp/$IMAGE .
+mv $IMAGE $IMAGE.nogz
+
+echo -e "<3> gzipping initrd ...\n"
+gzip -9 < $IMAGE.nogz > $IMAGE
+echo -e "\t$IMAGE\n"
+
+rm -rf $MNTPOINT 

@@ -1,0 +1,747 @@
+#!/usr/bin/python
+#
+# ROSI: Redoop OS Installer based on
+# the Red Hat Linux Installation program anaconda.
+#
+# Copyright (C) 2013 Redoop.org  All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# This is a whole rewritied installer based on Anaconda installer:
+# This initial phase aims:
+#   - basic layout partitioning
+#   - only ext3 formating
+#   - dump of rootfs from OpenEmbedded BSP.
+#
+# ROSI Author(s):
+#	    Javi Roman <javiroman@redoop.org>
+#
+import sys
+import os
+import time
+import subprocess
+import tarfile
+import shutil
+from snack import *
+
+import gettext
+_ = lambda x: gettext.ldgettext("anaconda", x)
+
+global log
+
+fstype2tool = {"ext3":("mkfs.ext3", "-v"), "swap":("mkswap", "-V1")}
+
+def setupPythonPath():
+    '''Set real path or development paths for run in svn'''
+
+    if (os.path.exists('../stage-2')):
+        sys.path.insert(0, 'usr/lib/anaconda')
+    else:
+        sys.path.insert(0, '/usr/lib/anaconda')
+        sys.path.append('/usr/share/system-config-date')
+
+def setupEnvironment():
+    os.environ['HOME'] = '/tmp'
+    os.environ['LC_NUMERIC'] = 'C'
+
+    # In theory, this gets rid of our LVM file descriptor warnings
+    os.environ["LVM_SUPPRESS_FD_WARNINGS"] = "1"
+
+    # make sure we have /sbin and /usr/sbin in our path
+    os.environ["PATH"] += ":/sbin:/usr/sbin"
+
+    # we can't let the LD_PRELOAD hang around because it will leak into
+    # rpm %post and the like.  ick :/
+    if os.environ.has_key("LD_PRELOAD"):
+        del os.environ["LD_PRELOAD"]
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError, exc:
+        if exc.errno == errno.EEXIST:
+            pass
+        else: 
+            raise
+
+def strip_markup(text):
+    if text.find("<") == -1:
+        return text
+    r = ""
+    inTag = False
+    for c in text:
+        if c == ">" and inTag:
+            inTag = False
+            continue
+        elif c == "<" and not inTag:
+            inTag = True
+            continue
+        elif not inTag:
+            r += c
+    return r.encode("utf-8")
+
+def setupLoggingFromOpts(opts):
+    if opts.loglevel and logLevelMap.has_key(opts.loglevel):
+        log.setHandlersLevel(logLevelMap[opts.loglevel])
+
+    if opts.syslog:
+        if opts.syslog.find(":") != -1:
+            (host, port) = opts.syslog.split(":")
+            logger.addSysLogHandler(log, host, port=int(port))
+        else:
+            logger.addSysLogHandler(log, opts.syslog)
+
+def enoughMemory():
+    '''Minimal RAM for text mode installation, the only mode for us'''
+
+    if iutil.memInstalled() < MIN_RAM:
+        screen = SnackScreen()
+        ButtonChoiceWindow(screen, _('Fatal Error'),
+                            _('You do not have enough RAM to install %s '
+                              'on this machine.\n'
+                              '\n'
+                              'Press <return> to reboot your system.\n')
+                           %(product.productName,),
+                           buttons = (_("OK"),))
+        screen.finish()
+        return 0
+    else:
+        return 1
+
+def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
+                          progress = None, root = '/'):
+    argv = list(argv)
+    if type(stdin) == type("string"):
+        if os.access(stdin, os.R_OK):
+            stdin = open(stdin)
+        else:
+            stdin = 0
+
+    if type(stdout) == type("string"):
+        stdout = open(stdout, "w")
+    if type(stderr) == type("string"):
+        stderr = open(stderr, "w")
+    if stdout is not None and type(stdout) != int:
+        stdout.write("Running... %s\n" %([command] + argv,))
+
+    p = os.pipe()
+    childpid = os.fork()
+    if not childpid:
+        os.close(p[0])
+        os.dup2(p[1], 1)
+        os.dup2(stderr.fileno(), 2)
+        os.dup2(stdin, 0)
+        os.close(stdin)
+        os.close(p[1])
+        stderr.close()
+
+        os.execvp(command, [command] + argv)
+        os._exit(1)
+
+    os.close(p[1])
+
+    while 1:
+        try:
+            s = os.read(p[0], 1)
+        except OSError, args:
+            (num, str) = args
+            if (num != 4):
+                raise IOError, args
+
+        stdout.write(s)
+        if progress: 
+            progress.pulse()
+
+        if len(s) < 1:
+            break
+
+    try:
+        (pid, status) = os.waitpid(childpid, 0)
+    except OSError, (num, msg):
+        log.critical("exception from waitpid: %s %s" %(num, msg))
+
+    progress and progress.pop()
+
+    # *shrug*  no clue why this would happen, but hope that things are fine
+    if status is None:
+        return 0
+
+    if os.WIFEXITED(status):
+        return os.WEXITSTATUS(status)
+
+    return 1
+
+class ProgressWindow:
+    def __init__(self, screen, title, text, total, updpct = 0.05, pulse = False):
+        self.count = 0
+        self.multiplier = 1
+        self.screen = screen
+        width = 55
+        self.total = total
+
+        if self.total == 1.0:
+            self.multiplier = 100
+
+        if (len(text) > width):
+            width = len(text)
+
+        t = TextboxReflowed(width, text)
+
+        g = GridForm(self.screen, title, 1, 2)
+        g.add(t, 0, 0, (0, 0, 0, 1), anchorLeft=1)
+
+        # bar -> scale(width, full_value)
+        self.scale = Scale(int(width), int(float(self.total) * self.multiplier))
+        if not pulse:
+            g.add(self.scale, 0, 1)
+
+        g.draw()
+        self.screen.refresh()
+
+    def pop(self):
+        self.screen.popWindow()
+        self.screen.refresh()
+        del self.scale
+        self.scale = None
+
+    def pulse(self):
+        if self.count == self.total:
+            self.count = 0
+
+        self.count = self.count + 1
+        self.set(self.count)
+
+    def set(self, amount):
+        self.scale.set(int(float(amount) * self.multiplier))
+        self.screen.refresh()
+
+    def refresh(self):
+        pass
+
+class InstallProgressWindow:
+    def __init__(self, screen, title, text, total, pulse = False):
+        self.count = 0
+        self.multiplier = 1
+        self.screen = screen
+        width = 55
+        self.total = total
+
+        if self.total == 1.0:
+            self.multiplier = 100
+
+        if (len(text) > width):
+            width = len(text)
+
+        self.grid = GridForm(self.screen, title, 1, 6)
+
+        self.width = 65
+        self.scale = Scale(int(width), int(float(self.total) * self.multiplier))
+        self.grid.add (self.scale, 0, 1, (0, 1, 0, 0))
+
+        self.label = Label("")
+        self.grid.add(self.label, 0, 2, (0, 1, 0, 0), anchorLeft = 1)
+
+        self.info = Textbox(self.width, 4, "", wrap = 1)
+        self.grid.add(self.info, 0, 3, (0, 1, 0, 0))
+
+        self.grid.draw()
+        self.screen.refresh()
+        self.drawn = True
+
+    def processEvents(self):
+        self.grid.draw()
+        self.screen.refresh()
+
+    def set_label(self, txt):
+        if not self.drawn:
+            self.setupScreen()
+        
+        self.info.setText(txt)
+        self.processEvents()
+
+    def set_text(self, txt):
+        #if not self.drawn:
+        #    self.setupScreen()
+        
+        if len(txt) > self.width:
+            txt = txt[:self.width]
+        else:
+            spaces = (self.width - len(txt)) / 2
+            txt = (" " * spaces) + txt
+        
+        self.label.setText(txt)
+        self.processEvents()
+
+    def pop(self):
+        self.screen.popWindow()
+        self.screen.refresh()
+        del self.scale
+        self.scale = None
+
+    def pulse(self):
+        if self.count == self.total:
+            self.count = 0
+
+        self.count = self.count + 1
+        self.set(self.count)
+
+    def set(self, amount):
+        self.scale.set(int(float(amount) * self.multiplier))
+        self.screen.refresh()
+
+    def refresh(self):
+        pass
+
+
+class DiskSet:
+    """The disks in the system."""
+
+    def __init__ (self):
+        self.deviceFile = None
+
+    def driveList(self):
+        for dev in minihal.get_devices_by_type("storage"):
+            if dev['device'] is None:
+                continue
+
+            device = dev['device'].replace('/dev/','')
+
+            log.info("detected possible disk: %s" %(device,))
+            log.info("device type: %s" %(dev['storage.drive_type'],))
+
+            if device.startswith("sg"):
+                log.info("ignoring st device %s" %(device,))
+                continue
+
+            if device.startswith("md"):
+                log.info("ignoring sr device %s" %(device,))
+                continue
+	
+            if device.startswith("sr"):
+                log.info("ignoring sr device %s" %(device,))
+                continue
+
+            if dev['storage.drive_type'] == 'disk':
+                self.deviceFile = dev['device']
+                log.info("final disk selected: %s" %(self.deviceFile,))
+
+	if not self.deviceFile:
+                log.warning("no detected possible disks: %s" %(device,))
+
+        return self.deviceFile
+
+    def megabytes_to_sectors(self, mb, sector_bytes=512):
+        return long(mb * MEGABYTE / sector_bytes)
+
+    def sectors_to_megabytes(self, sectors, sector_bytes=512):
+        return float((float(sectors) * sector_bytes)/ float(MEGABYTE))
+
+    def convert_bytes(self, bytes):
+        bytes = float(bytes)
+        if bytes >= 1099511627776:
+            terabytes = bytes / 1099511627776
+            size = '%.2fT' % terabytes
+        elif bytes >= 1073741824:
+            gigabytes = bytes / 1073741824
+            size = '%.2fG' % gigabytes
+        elif bytes >= 1048576:
+            megabytes = bytes / 1048576
+            size = '%.2fM' % megabytes
+        elif bytes >= 1024:
+            kilobytes = bytes / 1024
+            size = '%.2fK' % kilobytes
+        else:
+            size = '%.2fb' % bytes
+        return size
+
+    def createPartitionsV1(self):
+        '''Up to now, the partition layout is fixed to conservative
+        values. The current layout is:
+        /dev/sda1    boot partition -> 100MB
+        /dev/sda2    swap partition -> 1.5 size of RAM
+        /dev/sda3    root partition -> remaining disk space
+        '''
+        parted_dev = parted.PedDevice.get(self.deviceFile)
+
+        try:
+            parted_disk = parted.PedDisk.new(parted_dev)
+        except parted.error, msg:
+            '''A entire zero disk hasn't partition table.
+            Parted open() need a disk label for normal operation'''
+            log.error("ivalid partition table: %s" % msg)
+            label = label = parted.disk_type_get('msdos')
+            disk = parted_dev.disk_new_fresh(label)
+            disk.commit()
+            parted_disk = parted.PedDisk.new(parted_dev)
+            
+        fstypeParted = parted.file_system_type_get('ext3')
+        fsswapParted = parted.file_system_type_get('linux-swap')
+
+        # partition new values startSec, endSec, I mean sectors.
+        sizeMB = float(parted_dev.heads * parted_dev.cylinders * parted_dev.sectors) \
+                / (1024 * 1024) * parted_dev.sector_size
+        
+        bootsize = self.megabytes_to_sectors(100)
+        partitionBoot = \
+            parted_disk.partition_new(parted.PARTITION_PRIMARY,
+                                     fstypeParted,
+                                     1,
+                                     bootsize)
+        swapsize = self.megabytes_to_sectors(500)
+        partitionSwap = \
+            parted_disk.partition_new(parted.PARTITION_PRIMARY,
+                                     fsswapParted, 
+                                     bootsize+1,
+                                     bootsize+swapsize)
+        partitionRoot = \
+            parted_disk.partition_new(parted.PARTITION_PRIMARY,
+                                     fstypeParted, 
+                                     bootsize+swapsize+1, 
+                                     parted_dev.length-1)
+        parted_disk.dev.open()
+        parted_disk.delete_all()
+        entireDisk = parted.PedDevice.get(self.deviceFile).constraint_any()
+        parted_disk.add_partition(partitionBoot, entireDisk)
+        parted_disk.add_partition(partitionSwap, entireDisk)
+        parted_disk.add_partition(partitionRoot, entireDisk)
+        parted_disk.commit()
+
+        # set boot flag in this point
+        partition = parted_disk.get_partition(BOOTPARTITION)
+        partition.set_flag(parted.PARTITION_BOOT, 1)
+        parted_disk.commit()
+            
+        return 0
+
+    def createPartitionsV2(self):
+        '''Up to now, the partition layout is fixed to conservative
+        values. The current layout is:
+        /dev/sda1    boot partition -> 100MB
+        /dev/sda2    swap partition -> 1.5 size of RAM
+        /dev/sda3    root partition -> remaining disk space
+        '''
+	target_device = parted.Device(path=self.deviceFile)
+
+	# log diskinformation for debug
+	(cylinders, heads, sectors) = target_device.biosGeometry
+	sizeInBytes = target_device.length * target_device.sectorSize
+	geometry_cad = "%d heads, %d sectors/track, %d cylinders\n" % (heads, sectors, cylinders,)
+	size_cad = "Disk /dev/sdb size: %s\n" % (self.convert_bytes(sizeInBytes),)
+    	log.info(geometry_cad)
+    	log.info(size_cad)
+
+	# Create Disk object
+	target_disk = parted.freshDisk(target_device, "msdos")
+
+	target_constraint = parted.Constraint(device = target_device)
+
+	# Create geometry for 100MB from sector 1 - boot partition
+	bootsize = self.megabytes_to_sectors(100)
+
+	boot_partition_geom = parted.Geometry(device=target_device, start=1, end=bootsize) 
+	filesystem_target = parted.FileSystem(type="ext3", geometry=boot_partition_geom)
+	boot_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
+		type=parted.PARTITION_NORMAL, geometry=boot_partition_geom)
+
+	# Create geometry for 500MB of swap partition
+	swapsize = self.megabytes_to_sectors(500)
+
+	swap_partition_geom = parted.Geometry(device=target_device, start=bootsize+1, end=bootsize+swapsize)
+	filesystem_target = parted.FileSystem(type="linux-swap(v1)", geometry=swap_partition_geom)
+	swap_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
+		type=parted.PARTITION_NORMAL, geometry=swap_partition_geom)
+
+	root_partition_geom = parted.Geometry(device=target_device, start=bootsize+swapsize+1, end=target_device.length-1)
+	filesystem_target = parted.FileSystem(type="ext3", geometry=root_partition_geom)
+	root_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
+		type=parted.PARTITION_NORMAL, geometry=root_partition_geom)
+
+
+	# Delete all partitions in the drive
+	target_disk.deleteAllPartitions()
+	# Add new partitions
+	target_disk.addPartition(partition = boot_partition, constraint=target_constraint)
+	target_disk.addPartition(partition = swap_partition, constraint=target_constraint)
+	target_disk.addPartition(partition = root_partition, constraint=target_constraint)
+	# All the stuff we just did needs to be committed to the disk.
+	target_disk.commit()
+
+        return 0
+
+    def formatDisk(self, w, devicePath, formattool):
+        
+        rc = execWithPulseProgress(formattool[0], 
+                            [formattool[1], 
+                            devicePath],
+                            stdout="/tmp/resize.out",
+                            stderr="/tmp/resize.out",
+                            progress = w);
+
+class BspImage:
+    def __init__(self, filename, destdir, disk):
+        self.bspfile = "/mnt/stage2/bsp/" + filename
+        self.outputdir = destdir
+        self.total = 0
+        self.list_of_names = ()
+        self.tar = None
+        self.disk = disk
+
+    def loadBsp(self):
+        self.tar = tarfile.open(self.bspfile, "r:gz")
+        self.list_of_names = self.tar.getnames()
+
+        self.total = len(self.list_of_names)
+
+    def transferFiles(self, w):
+        os.mkdir(INSTALLDEST)
+        # FIXME: hard coded
+        isys.mount(self.disk + "3", INSTALLDEST, fstype="ext3")
+        os.mkdir(INSTALLDEST + "/boot")
+        # FIXME: hard coded
+        isys.mount(self.disk + "1", INSTALLDEST +"/boot", fstype="ext3")
+
+        for filename in self.list_of_names:
+            try:
+                f = self.tar.extract(filename, self.outputdir)
+                w.set_label(filename)
+                w.pulse()
+            except KeyError:
+                print 'ERROR: Did not find %s in tar archive' % filename
+
+    def getTotalFiles(self):
+        return self.total
+
+
+class WelcomeWindow:
+    def __call__(self, screen, anaconda):
+        rc = ButtonChoiceWindow(screen, _("%s") % (productName,), 
+                                _("Welcome to %s installer! "
+                                "\n\n"
+                                "This installation will delete all your disk data."
+                                "All disk partitions will be erased and formated."
+                                "\n\n")
+                                % ("BEETLE POS Ameba", ),
+                                buttons = (_("OK"),), width = 50,
+				help = "welcome")
+
+        return 0 
+
+class CongratsWindow:
+    def __call__(self, screen, anaconda):
+        rc = ButtonChoiceWindow(screen, _("%s") % (productName,), 
+                                _("Congratulations! "
+                                "\n\n"
+                                "Congratulations the installation is complete."
+                                "\n\n"
+                                "Remove any installation media usaded during"
+                                "\n"
+                                "the installation process and press Reboot button."),
+                                buttons = (_("Reboot"),), width = 40,
+				help = "welcome")
+
+        return 0 
+
+class WaitWindow:
+    def __init__(self, screen, title, text):
+        self.screen = screen
+        width = 100
+        if (len(text) < width): width = len(text)
+
+        t = TextboxReflowed(width, text)
+
+        g = GridForm(self.screen, title, 1, 1)
+        g.add(t, 0, 0)
+        g.draw()
+        self.screen.refresh()
+
+    def pop(self):
+        self.screen.popWindow()
+        self.screen.refresh()
+
+class AmebaInstaller:
+    def __init__(self):
+        self.targetdisk = None
+        self.screen = SnackScreen()
+        self.drawMainFrame()
+        self.displayWellcome()
+        self.prepareDisk()
+        self.transferBSP()
+        self.installGRUB()
+        self.finalSteps()
+
+    def displayWellcome(self):
+        wellcome = WelcomeWindow() 
+        wellcome(self.screen, 0)
+
+    def drawMainFrame(self):
+        productArch = "Wincor Nixdorf BEETLE POS system"
+        self.screen.drawRootText (0, 0, self.screen.width * " ")
+        self.screen.drawRootText (0, 0,
+            _("Welcome to %s for %s") % (productName, productArch,))
+        self.screen.pushHelpLine(
+            _("  <Tab>/<Alt-Tab> between elements   | <Space> selects   |  <F12> next screen"))
+
+    def prepareDisk(self):
+        w = WaitWindow(self.screen, "Wait please", 
+            "Detecting disks for installation")
+        time.sleep(2)
+        ds = DiskSet()
+        self.targetdisk = ds.driveList()
+        w.pop()
+        w = WaitWindow(self.screen, "Wait please", 
+            "The installer is preparing %s disk for installation" % self.targetdisk)
+        time.sleep(2)
+        w.pop()
+
+        # Partitioning
+        ds.createPartitionsV2()
+        title = "Master Boot Record creation"
+        text = "Partitioning in progress ..."
+        total = 2
+        w = ProgressWindow(self.screen, title, text, total)
+
+        for i in range(1, total+1):
+            w.pulse()
+            time.sleep(1)
+
+        w.pop()
+
+        # Format
+        w = WaitWindow(self.screen, "Boot partition", 
+            "Ready to format Boot partition")
+        time.sleep(2)
+        w.pop()
+
+        title = "Boot partition"
+        text = "Making ext3 filesystem in boot partition ..."
+        total = 500
+        w = ProgressWindow(self.screen, title, text, total)
+        # FIXME: hard coded
+        ds.formatDisk(w, self.targetdisk + "1", fstype2tool["ext3"])
+        w.pop()
+
+        w = WaitWindow(self.screen, "Root partition", 
+            "Ready to format Root partition")
+        time.sleep(2)
+        w.pop()
+
+        title = "Root partition"
+        text = "Making ext3 filesystem in root partition ..."
+        total = 2000
+        w = ProgressWindow(self.screen, title, text, total)
+        # FIXME: hard coded
+        ds.formatDisk(w, self.targetdisk + "3", fstype2tool["ext3"])
+        w.pop()
+
+        w = WaitWindow(self.screen, "Swap partition", 
+            "Enabling swap partition")
+        time.sleep(2)
+        w.pop()
+
+        title = "Swap space"
+        text = "Making swap filesystem ..."
+        total = 2000
+        w = ProgressWindow(self.screen, title, text, total)
+        # FIXME: hard coded
+        ds.formatDisk(w, self.targetdisk + "2", fstype2tool["swap"])
+        w.pop()
+
+      
+        return 0
+
+    def transferBSP(self):
+        w = WaitWindow(self.screen, "Preparing BSP installation", 
+            "Loading Redoop BSP, wait please ...")
+
+        tb = BspImage(BSPFILE, INSTALLDEST, self.targetdisk)
+        tb.loadBsp()
+        total = tb.getTotalFiles()
+        time.sleep(1)
+        w.pop()
+
+        title = "BSP installation"
+        text = "Installation in progress ..."
+        w = InstallProgressWindow(self.screen, title, text, total)
+        w.set_text("boot population")
+
+        tb.transferFiles(w)
+        w.pop()
+
+        w = WaitWindow(self.screen, "Congratulation", 
+            "BSP installed with success!")
+        time.sleep(2)
+        w.pop()
+
+        return 0
+
+    def installGRUB(self):
+        w = WaitWindow(self.screen, "Wait please", 
+            "Installing GRUB boot loader ...")
+        time.sleep(2)
+        w.pop()
+
+        mkdir_p(INSTALLDEST + "/boot/grub/")
+        grub_file = INSTALLDEST + "/boot/grub/menu.lst"
+        shutil.copy("/usr/share/grub/stage1", "/mnt/disk/boot/grub/stage1")
+        shutil.copy("/usr/share/grub/stage2", "/mnt/disk/boot/grub/stage2")
+
+        # FIXME: hard coded
+        grubconf = GRUB % (self.targetdisk)
+        f = open(grub_file, 'w') 
+        f.write(grubconf)
+        f.close()
+
+        # grub-install here.
+        try:
+            process = subprocess.Popen('/usr/bin/grub-install', 
+                                stdout=subprocess.PIPE, 
+                                stderr=subprocess.STDOUT,
+                                shell=True)
+            process.wait()
+        except:
+            os.system("/bin/bash")
+        
+    def finalSteps(self):
+        congrats = CongratsWindow() 
+        congrats(self.screen, 0)
+
+def main():
+    if not enoughMemory():
+        return 0
+
+    log.info("Installer runnting, good luck!")
+
+    amebainstaller = AmebaInstaller()
+
+    return 0
+
+if __name__ == "__main__":
+    setupPythonPath()
+
+    # Custom imports here after custom path
+    import logging
+    import product
+    import iutil
+    import isys
+    import parted
+    import minihal
+    from constants import *
+
+    logging.basicConfig(filename='/tmp/anaconda.log',level=logging.DEBUG)
+    log = logging.getLogger("anaconda")
+
+    sys.exit(main())
+
+# vim: ts=4:sw=4:et:sts=4:ai:tw=80
+

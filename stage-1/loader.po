@@ -1,0 +1,887 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-05-23 21:11+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: cdinstall.c:176 cdinstall.c:197 mediacheck.c:60
+msgid "Media Check"
+msgstr ""
+
+#: cdinstall.c:176 cdinstall.c:179 cdinstall.c:197 cdinstall.c:205
+#: method.c:328
+msgid "Test"
+msgstr ""
+
+#: cdinstall.c:176 cdinstall.c:180
+msgid "Eject Disc"
+msgstr ""
+
+#: cdinstall.c:177
+#, c-format
+msgid ""
+"Choose \"%s\" to test the disc currently in the drive, or \"%s\" to eject "
+"the disc and insert another for testing."
+msgstr ""
+
+#: cdinstall.c:197 cdinstall.c:205 driverdisk.c:446
+msgid "Continue"
+msgstr ""
+
+#: cdinstall.c:198
+#, c-format
+msgid ""
+"If you would like to test additional media, insert the next disc and press "
+"\"%s\". Testing each disc is not strictly required, however it is highly "
+"recommended.  Minimally, the discs should be tested prior to using them for "
+"the first time. After they have been successfully tested, it is not required "
+"to retest each disc prior to using it again."
+msgstr ""
+
+#. we don't have any more modules of the proper class.  ask
+#. * them to manually load
+#: cdinstall.c:219 cdinstall.c:516 driverdisk.c:100 driverdisk.c:307
+#: driverdisk.c:342 driverdisk.c:373 driverdisk.c:381 driverdisk.c:445
+#: hdinstall.c:143 hdinstall.c:352 hdinstall.c:454 hdinstall.c:497
+#: hdinstall.c:510 kickstart.c:284 lang.c:115 loader.c:400 loader.c:517
+#: loader.c:1203 mediacheck.c:46 mediacheck.c:85 mediacheck.c:92 method.c:281
+#: method.c:355 nfsinstall.c:244 nfsinstall.c:263 telnetd.c:92 urlinstall.c:83
+#: urlinstall.c:107 urlinstall.c:175 urls.c:328 urls.c:334
+msgid "Error"
+msgstr ""
+
+#. button bar at the bottom of the window
+#: cdinstall.c:219 cdinstall.c:223 cdinstall.c:239 cdinstall.c:242
+#: cdinstall.c:442 cdinstall.c:449 cdinstall.c:516 dirbrowser.c:145
+#: driverdisk.c:100 driverdisk.c:245 driverdisk.c:276 driverdisk.c:307
+#: driverdisk.c:342 driverdisk.c:361 driverdisk.c:373 driverdisk.c:381
+#: driverdisk.c:541 driverdisk.c:578 driverselect.c:81 driverselect.c:205
+#: hdinstall.c:143 hdinstall.c:289 hdinstall.c:352 hdinstall.c:384
+#: hdinstall.c:454 hdinstall.c:497 hdinstall.c:510 kbd.c:138 kickstart.c:132
+#: kickstart.c:142 kickstart.c:185 kickstart.c:284 kickstart.c:375
+#: kickstart.c:553 lang.c:115 lang.c:378 loader.c:400 loader.c:436
+#: loader.c:479 loader.c:500 loader.c:517 loader.c:554 loader.c:1203
+#: loader.c:1379 mediacheck.c:46 mediacheck.c:85 mediacheck.c:92
+#: mediacheck.c:101 method.c:281 method.c:355 modules.c:335 modules.c:347
+#: net.c:519 net.c:892 net.c:1480 net.c:1503 net.c:1694 net.c:1716 net.c:1728
+#: nfsinstall.c:87 nfsinstall.c:244 nfsinstall.c:263 nfsinstall.c:331
+#: telnetd.c:92 urlinstall.c:83 urlinstall.c:107 urlinstall.c:175
+#: urlinstall.c:418 urlinstall.c:427 urlinstall.c:436 urls.c:292 urls.c:328
+#: urls.c:334 urls.c:346
+msgid "OK"
+msgstr ""
+
+#: cdinstall.c:220
+#, c-format
+msgid ""
+"The %s disc was not found in any of your drives. Please insert the %s disc "
+"and press %s to retry."
+msgstr ""
+
+#: cdinstall.c:239
+msgid "Disc Found"
+msgstr ""
+
+#: cdinstall.c:239 cdinstall.c:242 method.c:328
+msgid "Skip"
+msgstr ""
+
+#: cdinstall.c:240
+#, c-format
+msgid ""
+"To begin testing the media before installation press %s.\n"
+"\n"
+"Choose %s to skip the media test and start the installation."
+msgstr ""
+
+#: cdinstall.c:334
+msgid "Scanning"
+msgstr ""
+
+#: cdinstall.c:334 cdinstall.c:336
+#, c-format
+msgid "Looking for installation images on CD device %s"
+msgstr ""
+
+#: cdinstall.c:439
+#, c-format
+msgid ""
+"The %s disc was not found in any of your CDROM drives. Please insert the %s "
+"disc and press %s to retry."
+msgstr ""
+
+#: cdinstall.c:448
+msgid "Disc Not Found"
+msgstr ""
+
+#: cdinstall.c:449 driverdisk.c:246 driverdisk.c:277 driverdisk.c:361
+#: driverselect.c:81 driverselect.c:179 driverselect.c:205 hdinstall.c:231
+#: hdinstall.c:289 kbd.c:138 loader.c:480 loader.c:500 loader.c:1379
+#: loader.c:1409 net.c:519 net.c:892 net.c:1694 net.c:1716 nfsinstall.c:87
+#: urls.c:292
+msgid "Back"
+msgstr ""
+
+#: cdinstall.c:517
+msgid "Cannot find kickstart file on CDROM."
+msgstr ""
+
+#: copy.c:51 method.c:282
+#, c-format
+msgid "Failed to read directory %s: %m"
+msgstr ""
+
+#: dirbrowser.c:145 driverdisk.c:246 kickstart.c:375 loader.c:436 loader.c:554
+msgid "Cancel"
+msgstr ""
+
+#: driverdisk.c:141
+msgid "Loading"
+msgstr ""
+
+#: driverdisk.c:141
+msgid "Reading driver disk..."
+msgstr ""
+
+#: driverdisk.c:240 driverdisk.c:272
+msgid "Driver Disk Source"
+msgstr ""
+
+#: driverdisk.c:241
+msgid ""
+"You have multiple devices which could serve as sources for a driver disk.  "
+"Which would you like to use?"
+msgstr ""
+
+#: driverdisk.c:273
+msgid ""
+"There are multiple partitions on this device which could contain the driver "
+"disk image.  Which would you like to use?"
+msgstr ""
+
+#: driverdisk.c:308
+msgid "Failed to mount partition."
+msgstr ""
+
+#: driverdisk.c:313
+msgid "Select driver disk image"
+msgstr ""
+
+#: driverdisk.c:314
+msgid "Select the file which is your driver disk image."
+msgstr ""
+
+#: driverdisk.c:343
+msgid "Failed to load driver disk from file."
+msgstr ""
+
+#: driverdisk.c:355
+#, c-format
+msgid "Insert your driver disk into /dev/%s and press \"OK\" to continue."
+msgstr ""
+
+#: driverdisk.c:361
+msgid "Insert Driver Disk"
+msgstr ""
+
+#: driverdisk.c:374
+msgid "Failed to mount driver disk."
+msgstr ""
+
+#: driverdisk.c:382
+#, c-format
+msgid "Driver disk is invalid for this release of %s."
+msgstr ""
+
+#: driverdisk.c:445
+msgid "Manually choose"
+msgstr ""
+
+#: driverdisk.c:446
+msgid "Load another disk"
+msgstr ""
+
+#: driverdisk.c:447
+msgid ""
+"No devices of the appropriate type were found on this driver disk.  Would "
+"you like to manually select the driver, continue anyway, or load another "
+"driver disk?"
+msgstr ""
+
+#: driverdisk.c:485
+msgid "Driver disk"
+msgstr ""
+
+#: driverdisk.c:485 driverdisk.c:495 hdinstall.c:231
+msgid "Yes"
+msgstr ""
+
+#: driverdisk.c:485 driverdisk.c:495
+msgid "No"
+msgstr ""
+
+#: driverdisk.c:486
+msgid "Do you have a driver disk?"
+msgstr ""
+
+#: driverdisk.c:495
+msgid "More Driver Disks?"
+msgstr ""
+
+#: driverdisk.c:496
+msgid "Do you wish to load any more driver disks?"
+msgstr ""
+
+#: driverdisk.c:541 driverdisk.c:578 hdinstall.c:384 kickstart.c:132
+#: kickstart.c:142 kickstart.c:185 kickstart.c:553 modules.c:335 modules.c:347
+#: net.c:1480 net.c:1503 nfsinstall.c:331 urlinstall.c:418 urlinstall.c:427
+#: urlinstall.c:436
+msgid "Kickstart Error"
+msgstr ""
+
+#: driverdisk.c:542
+#, c-format
+msgid "Unknown driver disk kickstart source: %s"
+msgstr ""
+
+#: driverdisk.c:579
+#, c-format
+msgid ""
+"The following invalid argument was specified for the kickstart driver disk "
+"command: %s:%s"
+msgstr ""
+
+#: driverselect.c:67
+#, c-format
+msgid ""
+"Please enter any parameters which you wish to pass to the %s module "
+"separated by spaces.  If you don't know what parameters to supply, skip this "
+"screen by pressing the \"OK\" button."
+msgstr ""
+
+#: driverselect.c:91
+msgid "Enter Module Parameters"
+msgstr ""
+
+#: driverselect.c:178
+msgid "No drivers found"
+msgstr ""
+
+#: driverselect.c:178
+msgid "Load driver disk"
+msgstr ""
+
+#: driverselect.c:179
+msgid ""
+"No drivers were found to manually insert.  Would you like to use a driver "
+"disk?"
+msgstr ""
+
+#: driverselect.c:197
+msgid ""
+"Please select the driver below which you wish to load.  If it does not "
+"appear and you have a driver disk, press F2."
+msgstr ""
+
+#: driverselect.c:206
+msgid "Specify optional module arguments"
+msgstr ""
+
+#: driverselect.c:234
+msgid "Select Device Driver to Load"
+msgstr ""
+
+#: hdinstall.c:144
+msgid ""
+"An error occured finding the installation image on your hard drive.  Please "
+"check your images and try again."
+msgstr ""
+
+#: hdinstall.c:231
+msgid "Hard Drives"
+msgstr ""
+
+#: hdinstall.c:232
+msgid ""
+"You don't seem to have any hard drives on your system! Would you like to "
+"configure additional devices?"
+msgstr ""
+
+#. now find out which partition has the stage2 image
+#: hdinstall.c:246
+#, c-format
+msgid ""
+"What partition and directory on that partition holds the installation image "
+"for %s?  If you don't see the disk drive you're using listed here, press F2 "
+"to configure additional devices."
+msgstr ""
+
+#: hdinstall.c:273
+msgid "Directory holding image:"
+msgstr ""
+
+#: hdinstall.c:301
+msgid "Select Partition"
+msgstr ""
+
+#: hdinstall.c:353
+#, c-format
+msgid "Device %s does not appear to contain an installation image."
+msgstr ""
+
+#: hdinstall.c:385
+#, c-format
+msgid "Bad argument to HD kickstart method command %s: %s"
+msgstr ""
+
+#: hdinstall.c:455 hdinstall.c:511
+msgid "Cannot find kickstart file on hard drive."
+msgstr ""
+
+#: hdinstall.c:498
+#, c-format
+msgid "Cannot find hard drive for BIOS disk %s"
+msgstr ""
+
+#: kbd.c:136
+msgid "Keyboard Type"
+msgstr ""
+
+#: kbd.c:137
+msgid "What type of keyboard do you have?"
+msgstr ""
+
+#: kickstart.c:133
+#, c-format
+msgid "Error opening kickstart file %s: %m"
+msgstr ""
+
+#: kickstart.c:143
+#, c-format
+msgid "Error reading contents of kickstart file %s: %m"
+msgstr ""
+
+#: kickstart.c:186
+#, c-format
+msgid "Error in %s on line %d of kickstart file %s."
+msgstr ""
+
+#: kickstart.c:285
+msgid "Cannot find ks.cfg on removable media."
+msgstr ""
+
+#: kickstart.c:380
+msgid ""
+"Unable to download the kickstart file.  Please modify the kickstart "
+"parameter below or press Cancel to proceed as an interactive installation."
+msgstr ""
+
+#: kickstart.c:389
+msgid "Error downloading kickstart file"
+msgstr ""
+
+#: kickstart.c:554
+#, c-format
+msgid "Bad argument to shutdown kickstart method command %s: %s"
+msgstr ""
+
+#: lang.c:63 loader.c:213
+#, c-format
+msgid "Welcome to %s for %s"
+msgstr ""
+
+#: lang.c:64
+#, c-format
+msgid "Welcome to %s for %s - Rescue Mode"
+msgstr ""
+
+#: lang.c:65 loader.c:224
+msgid ""
+"  <Tab>/<Alt-Tab> between elements  | <Space> selects | <F12> next screen "
+msgstr ""
+
+#: lang.c:375
+msgid "Choose a Language"
+msgstr ""
+
+#: lang.c:376
+msgid "What language would you like to use during the installation process?"
+msgstr ""
+
+#: loader.c:125
+msgid "Local CD/DVD"
+msgstr ""
+
+#: loader.c:126
+msgid "Hard drive"
+msgstr ""
+
+#: loader.c:127
+msgid "NFS directory"
+msgstr ""
+
+#: loader.c:431 loader.c:475
+msgid "Update Disk Source"
+msgstr ""
+
+#: loader.c:432
+msgid ""
+"You have multiple devices which could serve as sources for an update disk.  "
+"Which would you like to use?"
+msgstr ""
+
+#: loader.c:476
+msgid ""
+"There are multiple partitions on this device which could contain the update "
+"disk image.  Which would you like to use?"
+msgstr ""
+
+#: loader.c:494
+#, c-format
+msgid "Insert your updates disk into %s and press \"OK\" to continue."
+msgstr ""
+
+#: loader.c:500
+msgid "Updates Disk"
+msgstr ""
+
+#: loader.c:518
+msgid "Failed to mount updates disk"
+msgstr ""
+
+#. Copy everything to /tmp/updates so we can unmount the disk
+#: loader.c:523
+msgid "Updates"
+msgstr ""
+
+#: loader.c:523
+msgid "Reading anaconda updates..."
+msgstr ""
+
+#: loader.c:559
+msgid ""
+"Unable to download the updates image.  Please modify the updates location "
+"below or press Cancel to proceed without updates.."
+msgstr ""
+
+#: loader.c:568
+msgid "Error downloading updates image"
+msgstr ""
+
+#: loader.c:1196
+#, c-format
+msgid "You do not have enough RAM to install %s on this machine."
+msgstr ""
+
+#: loader.c:1254
+msgid "Media Detected"
+msgstr ""
+
+#: loader.c:1255
+msgid "Local installation media detected..."
+msgstr ""
+
+#: loader.c:1371
+msgid "Rescue Method"
+msgstr ""
+
+#: loader.c:1372
+msgid "Installation Method"
+msgstr ""
+
+#: loader.c:1374
+msgid "What type of media contains the rescue image?"
+msgstr ""
+
+#: loader.c:1376
+msgid "What type of media contains the installation image?"
+msgstr ""
+
+#: loader.c:1408
+msgid "No driver found"
+msgstr ""
+
+#: loader.c:1408
+msgid "Select driver"
+msgstr ""
+
+#: loader.c:1409
+msgid "Use a driver disk"
+msgstr ""
+
+#: loader.c:1410
+msgid ""
+"Unable to find any devices of the type needed for this installation type.  "
+"Would you like to manually select your driver or use a driver disk?"
+msgstr ""
+
+#: loader.c:1630
+msgid "The following devices have been found on your system."
+msgstr ""
+
+#: loader.c:1632
+msgid ""
+"No device drivers have been loaded for your system.  Would you like to load "
+"any now?"
+msgstr ""
+
+#: loader.c:1636
+msgid "Devices"
+msgstr ""
+
+#: loader.c:1637
+msgid "Done"
+msgstr ""
+
+#: loader.c:1638
+msgid "Add Device"
+msgstr ""
+
+#: loader.c:1829
+#, c-format
+msgid "loader has already been run.  Starting shell.\n"
+msgstr ""
+
+#: loader.c:2225
+#, c-format
+msgid "Running anaconda %s, the %s rescue mode - please wait...\n"
+msgstr ""
+
+#: loader.c:2227
+#, c-format
+msgid "Running anaconda %s, the %s system installer - please wait...\n"
+msgstr ""
+
+#: mediacheck.c:46
+#, c-format
+msgid "Unable to find install image %s"
+msgstr ""
+
+#: mediacheck.c:52
+#, c-format
+msgid "Checking \"%s\"..."
+msgstr ""
+
+#: mediacheck.c:54
+#, c-format
+msgid "Checking media now..."
+msgstr ""
+
+#: mediacheck.c:86
+msgid ""
+"Unable to read the disc checksum from the primary volume descriptor.  This "
+"probably means the disc was created without adding the checksum."
+msgstr ""
+
+#: mediacheck.c:93
+msgid ""
+"The image which was just tested has errors. This could be due to a corrupt "
+"download or a bad disc.  If applicable, please clean the disc and try "
+"again.  If this test continues to fail you should not continue the install."
+msgstr ""
+
+#: mediacheck.c:101
+msgid "Success"
+msgstr ""
+
+#: mediacheck.c:102
+msgid ""
+"The image which was just tested was successfully verified.  It should be OK "
+"to install from this media.  Note that not all media/drive errors can be "
+"detected by the media check."
+msgstr ""
+
+#: method.c:325
+#, c-format
+msgid ""
+"Would you like to perform a checksum test of the ISO image:\n"
+"\n"
+"   %s?"
+msgstr ""
+
+#: method.c:328
+msgid "Checksum Test"
+msgstr ""
+
+#: modules.c:336
+#, c-format
+msgid "Bad argument to device kickstart method command %s: %s"
+msgstr ""
+
+#: modules.c:348
+msgid "A module name must be specified for the kickstart device command."
+msgstr ""
+
+#: net.c:108
+msgid "Invalid Prefix"
+msgstr ""
+
+#: net.c:108 net.c:409 net.c:465 net.c:610 net.c:618 net.c:1041 net.c:1048
+msgid "Retry"
+msgstr ""
+
+#: net.c:109
+msgid ""
+"Prefix must be between 1 and 32 for IPv4 networks or between 1 and 128 for "
+"IPv6 networks"
+msgstr ""
+
+#: net.c:409 net.c:465
+msgid "Network Error"
+msgstr ""
+
+#: net.c:410 net.c:466
+msgid "There was an error configuring your network interface."
+msgstr ""
+
+#: net.c:497
+msgid "Enable IPv4 support"
+msgstr ""
+
+#: net.c:511
+msgid "Enable IPv6 support"
+msgstr ""
+
+#: net.c:551
+msgid "Configure TCP/IP"
+msgstr ""
+
+#: net.c:610
+msgid "Missing Protocol"
+msgstr ""
+
+#: net.c:611
+msgid "You must select at least one protocol (IPv4 or IPv6)."
+msgstr ""
+
+#: net.c:618
+msgid "IPv4 Needed for NFS"
+msgstr ""
+
+#: net.c:619
+msgid "NFS installation method requires IPv4 support."
+msgstr ""
+
+#: net.c:718
+msgid "IPv4 address:"
+msgstr ""
+
+#: net.c:730 net.c:797
+msgid "/"
+msgstr ""
+
+#: net.c:785
+msgid "IPv6 address:"
+msgstr ""
+
+#: net.c:851
+msgid "Gateway:"
+msgstr ""
+
+#: net.c:859
+msgid "Name Server:"
+msgstr ""
+
+#: net.c:898
+msgid ""
+"Enter the IPv4 and/or the IPv6 address and prefix (address / prefix).  For "
+"IPv4, the dotted-quad netmask or the CIDR-style prefix are acceptable. The "
+"gateway and name server fields must be valid IPv4 or IPv6 addresses."
+msgstr ""
+
+#: net.c:918
+msgid "Manual TCP/IP Configuration"
+msgstr ""
+
+#: net.c:1041 net.c:1048
+msgid "Missing Information"
+msgstr ""
+
+#: net.c:1042
+msgid ""
+"You must enter both a valid IPv4 address and a network mask or CIDR prefix."
+msgstr ""
+
+#: net.c:1049
+msgid "You must enter both a valid IPv6 address and a CIDR prefix."
+msgstr ""
+
+#: net.c:1481
+#, c-format
+msgid "Bad argument to kickstart network command %s: %s"
+msgstr ""
+
+#: net.c:1504
+#, c-format
+msgid "Bad bootproto %s specified in network command"
+msgstr ""
+
+#: net.c:1575
+msgid "Seconds:"
+msgstr ""
+
+#: net.c:1689
+msgid "Networking Device"
+msgstr ""
+
+#: net.c:1690
+msgid ""
+"You have multiple network devices on this system. Which would you like to "
+"install through?"
+msgstr ""
+
+#: net.c:1694
+msgid "Identify"
+msgstr ""
+
+#: net.c:1703
+msgid "You can identify the physical port for"
+msgstr ""
+
+#: net.c:1705
+msgid ""
+"by flashing the LED lights for a number of seconds.  Enter a number between "
+"1 and 30 to set the duration to flash the LED port lights."
+msgstr ""
+
+#: net.c:1715
+msgid "Identify NIC"
+msgstr ""
+
+#: net.c:1728
+msgid "Invalid Duration"
+msgstr ""
+
+#: net.c:1729
+msgid "You must enter the number of seconds as an integer between 1 and 30."
+msgstr ""
+
+#: net.c:1741
+#, c-format
+msgid "Flashing %s port lights for %d seconds..."
+msgstr ""
+
+#: net.c:1905 net.c:1909
+#, c-format
+msgid "Waiting for NetworkManager to configure %s...\n"
+msgstr ""
+
+#: nfsinstall.c:64
+msgid "NFS server name:"
+msgstr ""
+
+#: nfsinstall.c:68
+#, c-format
+msgid "%s directory:"
+msgstr ""
+
+#: nfsinstall.c:79
+#, c-format
+msgid "Please enter the server name and path to your %s installation image."
+msgstr ""
+
+#: nfsinstall.c:86
+msgid "NFS Setup"
+msgstr ""
+
+#: nfsinstall.c:245
+msgid "That directory could not be mounted from the server."
+msgstr ""
+
+#: nfsinstall.c:256
+#, c-format
+msgid "That directory does not seem to contain a %s installation image."
+msgstr ""
+
+#: nfsinstall.c:332
+#, c-format
+msgid "Bad argument to NFS kickstart method command %s: %s"
+msgstr ""
+
+#: telnetd.c:89 telnetd.c:128
+msgid "Telnet"
+msgstr ""
+
+#: telnetd.c:89
+msgid "Waiting for telnet connection..."
+msgstr ""
+
+#: telnetd.c:128
+msgid "Running anaconda via telnet..."
+msgstr ""
+
+#: urlinstall.c:84
+#, c-format
+msgid "Unable to retrieve %s://%s%s."
+msgstr ""
+
+#: urlinstall.c:176
+msgid "Unable to retrieve the install image."
+msgstr ""
+
+#: urlinstall.c:419
+#, c-format
+msgid "Bad argument to Url kickstart method command %s: %s"
+msgstr ""
+
+#: urlinstall.c:428
+msgid "Must supply a --url argument to Url kickstart method."
+msgstr ""
+
+#: urlinstall.c:437
+#, c-format
+msgid "Unknown Url method %s"
+msgstr ""
+
+#: urls.c:235 urls.c:237 urls.c:240
+msgid "Retrieving"
+msgstr ""
+
+#: urls.c:295
+#, c-format
+msgid ""
+"Please enter the URL containing the %s installation image on your server."
+msgstr ""
+
+#: urls.c:321
+msgid "URL Setup"
+msgstr ""
+
+#: urls.c:329
+msgid "You must enter a URL."
+msgstr ""
+
+#: urls.c:335
+msgid "URL must be either an ftp or http URL"
+msgstr ""
+
+#: urls.c:346
+msgid "Unknown Host"
+msgstr ""
+
+#: urls.c:347
+#, c-format
+msgid "%s is not a valid hostname."
+msgstr ""
+
+#: windows.c:65
+msgid "Loading SCSI driver"
+msgstr ""
+
+#: windows.c:66
+#, c-format
+msgid "Loading %s driver..."
+msgstr ""
