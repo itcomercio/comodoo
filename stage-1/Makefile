@@ -18,7 +18,7 @@
 #
 
 include ../Makefile.inc
-VERSION := r$(svn info |grep Revision: |cut -c11-)
+VERSION := r$(shell git rev-parse --short HEAD)
 
 ifeq (.depend,$(wildcard .depend))
 TARGET=$(PROGS)

@@ -1,1 +1,0 @@
-wget https://git.fedorahosted.org/cgit/isomd5sum.git/snapshot/isomd5sum-1.0.10.tar.gz
