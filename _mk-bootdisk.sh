@@ -54,9 +54,9 @@ DSO_DEPS=""
 LDSO=""
 
 # yoctoproject bsp files
-BZIMAGE="bzImage-*"
-ROOTFS="core-image-*"
-MODULES="modules-*"
+BZIMAGE=$(ls yocto | grep bzImage)
+ROOTFS=$(ls yocto | grep core)
+MODULES=$(ls yocto | grep modules)
 
 # Ubuntu 12 and Fedora 10 were tested for this installation
 DISTRO=`lsb_release -irc | grep ID | cut -d':' -f2 | tr -d [[:space:]]`
@@ -909,8 +909,17 @@ for i in a/ansi d/dumb l/linux s/screen v/vt100 v/vt100-nav v/vt102 ; do
         install -m 644 /lib/terminfo/$i $MKB_DIR/etc/terminfo/$i
 done
 
-# kernel modules population
-tar xzf yocto/modules-*.tgz -C $MKB_DIR
+# kernel modules population for initrd image
+mkdir yocto/tmp
+mkdir -p yocto/tmp2/lib
+tar xvzf yocto/${ROOTFS} -C yocto/tmp
+mv yocto/tmp/lib/modules yocto/tmp2/lib
+cd yocto/tmp2
+tar cvzf ../${MODULES} lib
+cd ../..
+rm -fr yocto/tmp
+rm -fr yocto/tmp2
+tar xzf yocto/${MODULES} -C $MKB_DIR
 
 install -m 644 /etc/passwd $MKB_DIR/etc/passwd
 install -m 644 /etc/group $MKB_DIR/etc/group
