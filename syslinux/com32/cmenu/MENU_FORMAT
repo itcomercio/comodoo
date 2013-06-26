@@ -1,0 +1,103 @@
+A .menu file can be used to describe basic menu structures which can be converted
+into C code which can then be compiled into a .c32 file for use with SYSLINUX.
+The format of a .menu file is similar to an ini file, but with important
+differences.
+
+Lines starting with # and ; are treated as comments. Blank lines are used to
+separate the attributes of one menu item from another. Multiple blank lines are
+equivalent to a single one.  In other contexts Blank lines are not significant.
+
+Menus
+-----
+Each menu declaration starts with a line containing the name of menu in [ ].
+This is the "nickname" of the menu and should be different for different menus.
+This is not visible to the user of the menu system. The initial menu must
+be called "main"
+
+The menu declaration is followed by lines which set the attributes of the menu.
+This is followed by a blank line and followed by declaration of menu items in
+that menu.
+
+All lines which occur before the first menu declaration is considered as
+a global declaration.
+
+Abstract Format
+---------------
+
+The overall format should look like this
+
+--------------------------------------------------------
+<GLOBAL SETTINGS>
+
+[menuname1]
+
+<MENU SETTINGS>
+
+<ITEM 1>
+
+...
+
+<ITEM N>
+
+[menuname2]
+
+<MENU SETTINGS>
+
+<ITEM A>
+
+<ITEM B>
+
+----------------------------------------------------------
+
+GLOBAL SETTINGS
+---------------
+The following global settings are now supported. Many of the keywords
+accept what we call a "DOT COMMAND" as argument. Simply put they are
+instructions to the menu system to perform certain actions.
+The syntax and semantics of DOT COMMANDS are given later in the section
+titled "DOT COMMANDS".
+
+videomode: (default 0xFF)  [Use with care]
+   The textmode in which the whole menu system should operate.
+   Must be a number (use 0x notation for hexadecimal).
+   Lookup Ralph Brown Interrupt List and search for Video Mode
+   to find a number to put here.
+
+   setting to 0xFF will mean, menu system will use the current
+   video mode.
+
+title:
+   The title of the whole menu system
+
+top, left, bot, right: (default 0,0,21,79)
+   The area of the screen used by the menu system. The remaining
+   part of the screen can be used by the user for anything.
+
+helpdir: (default /isolinux/help)
+   Location of the directory where help information is stored. The
+   help files must be called "hlpNNNNN.txt" where NNNNN is the helpid.
+
+pwdfile: (default /isolinux/passwd)
+   The name of the password file which contains user, password and permissions
+   See "passwd" file for details regarding format of this file
+
+editrow: (default 23)
+   the row on the screen where one can edit the command line. This must
+   be outside the menu area. Set this to a negative number to disable
+   editing the command line. In case of authenticated users, the current
+   user must have "editcmd" permissions to edit the command line
+
+pwdrow: (default 23)
+   The row on the screen used for user authentication. Must be outside
+   menu area (can be same as editrow). Set to negative to disable
+   user authentication
+
+skipif: (default 0)
+   The OR of the bits in the Shift-flags any of which can cause the menu system
+   to be skipped all together (0 means menu system always runs). It can also
+   be a combination of "Alt","Ctrl","Shift","Caps","Ins","Scroll".
+   When menu system starts it checks if any of the specified keys are On/pressed.
+   If true, the system exits immediately and executes the skipcmd.
+
+   e.g. setting it to "shift-alt-caps" means menu will be skipped if alt OR shift
+   is pressed OR caps is on. setting to "0" means menu will alw
