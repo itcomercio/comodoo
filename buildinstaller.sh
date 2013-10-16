@@ -25,9 +25,6 @@ usage () {
 }
 
 cleanall () {
-    rm -f addons/isolinux.bin
-    rm -f addons/vesamenu.c32
-    rm -rf addons/syslinux
     rm -f build.log
 
     make -C isys clean
