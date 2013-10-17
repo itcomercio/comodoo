@@ -324,7 +324,7 @@ makemainimage () {
     elif [ $type = "squashfs" ]; then
         makeproductfile $IMGPATH
         echo "Running mksquashfs $IMGPATH $mmi_tmpimage -all-root -no-fragments -no-progress"
-        mksquashfs $IMGPATH $mmi_tmpimage -all-root -no-fragments -no-progress
+        mksquashfs $IMGPATH $mmi_tmpimage -all-root -no-fragments -no-progress 
         chmod 0644 $mmi_tmpimage
         SIZE=$(expr `cat $mmi_tmpimage | wc -c` / 1024)
     elif [ $type = "cramfs" ]; then
@@ -891,6 +891,15 @@ else
 	echo_note "ERROR" "[ERROR]"
 fi
 
+echo_note "WARNING" "pyblock building...."
+echo "############### stage-1 #########" >> ${TOP_DIR}/logs/build
+make -C pyblock &>> ${TOP_DIR}/logs/build
+if [ $? = 0 ];then
+	echo_note "OK" "[OK]"
+else
+	echo_note "ERROR" "[ERROR]"
+fi
+
 echo_note "WARNING" "Install init in $MKB_DIR/sbin/init"
 instbin / $PWD/stage-1/init  $MKB_DIR /sbin/init &>> ${TOP_DIR}/logs/init-loader
 echo_note "OK" "[OK]"
@@ -904,6 +913,9 @@ ln -s ./init  $MKB_DIR/sbin/reboot
 ln -s ./init  $MKB_DIR/sbin/halt
 ln -s ./init  $MKB_DIR/sbin/poweroff
 cd $TOP_DIR
+
+cp pyblock/dmmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmmodule.so
+cp pyblock/dmraidmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmraidmodule.so
 
 # core linux utils population
 INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \

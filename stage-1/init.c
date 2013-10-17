@@ -737,9 +737,13 @@ int main(int argc, char **argv) {
 
     if (!(installpid = fork())) {
 
+	/* 
+         * comment out this lines for loader
+         * debuging, and comment in the following
+         * loader line.
+         */
         //printf("running bash for early testing\n");
         //*argvp++ = "/bin/bash";
-
 
         *argvp++ = "/sbin/loader";
 

@@ -18,6 +18,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+#
+# Minimal utilities for this tool.
+# tree, mksquashfs, mkisofs
+#
+
+
+# FIXME:
+# Only we can run being superuser, by now.
+
+[ `id -u` != "0" ] && echo "You must be root!" && exit
 
 usage () {
     echo "usage: mk-installer.sh [<cleanall>]"
@@ -31,6 +41,7 @@ cleanall () {
 
     make -C isys clean
     make -C stage-1 clean
+    make -C pyblock clean
 
     rm -fr CD
 
