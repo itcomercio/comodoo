@@ -40,6 +40,10 @@ cleanall () {
     rm -fr /tmp/instimage*
     rm -fr /tmp/keepfile.*
 
+    rm yocto/bzImage-romley.bin  
+    rm yocto/core-image-redoop-romley.tar.gz  
+    rm yocto/modules.tar.gz
+
     exit 0
 }
 

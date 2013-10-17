@@ -1,5 +1,13 @@
-BINS="beetlepos-image-beetlepos.tar.gz bzImage-beetlepos.bin modules-*"
+BINS="bzImage-romley.bin \
+core-image-redoop-romley.tar.gz \
+modules-*"
+
+BUILD_HOST="BaldCompiler.cloud.cediant.es"
+
+DEPLOY_PATH="/home/jroman/redoop-poky/build/tmp/deploy/images"
 
 for i in $BINS; do
-	scp builder@ameba:/builds/ASV1-BEETLEPOS/build/tmp/deploy/images/beetlepos/$i .
+	scp jroman@${BUILD_HOST}:${DEPLOY_PATH=}/$i .
 done
+
+mv modules* modules.tar.gz

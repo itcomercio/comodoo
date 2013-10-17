@@ -792,9 +792,6 @@ mkdir -p $MKB_DIR/var/cache/hald
 echo "syslinux download and building ...."
 cd $CUR_PWD
 pwd
-cd addons
-./mk-syslinux.sh
-cd -
 cp -a addons/isolinux ${MKB_SYSLINUX}
 cp addons/syslinux/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
 cp addons/syslinux/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
