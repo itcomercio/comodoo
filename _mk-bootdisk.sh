@@ -793,8 +793,8 @@ echo "syslinux download and building ...."
 cd $CUR_PWD
 pwd
 cp -a addons/isolinux ${MKB_SYSLINUX}
-cp addons/syslinux/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
-cp addons/syslinux/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
+cp syslinux/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
+cp syslinux/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
 
 #
 # First stage population (stage-1):
