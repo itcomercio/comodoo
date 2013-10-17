@@ -25,7 +25,9 @@ usage () {
 }
 
 cleanall () {
-    rm -f build.log
+    rm cd.iso
+    rm c.img
+
 
     make -C isys clean
     make -C stage-1 clean
@@ -40,6 +42,8 @@ cleanall () {
     rm yocto/bzImage-romley.bin  
     rm yocto/core-image-redoop-romley.tar.gz  
     rm yocto/modules.tar.gz
+
+    rm -fr logs
 
     exit 0
 }

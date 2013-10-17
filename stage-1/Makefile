@@ -48,8 +48,8 @@ LIBS   += $(shell pkg-config --libs dbus-1)
 CFLAGS += $(shell pkg-config --cflags dbus-1)
 
 # isomd5sum
-LIBS   += -L../.libs
-CFLAGS += -I../.include
+LIBS   += -L../isomd5sum
+CFLAGS += -I../isomd5sum
 
 
 ifeq (1, $(USESELINUX))
@@ -86,7 +86,7 @@ BINS += init
 endif
 
 # translation stuff
-LANGS = $(shell cut -f 2 ../lang-table | egrep -v '(^en$$)')
+LANGS = $(shell cut -f 2 ../addons/lang-table | egrep -v '(^en$$)')
 
 TR = $(patsubst %,tr/%.tr,$(LANGS))
 TRFILES = $(patsubst %,%.tr,$(LANGS))
