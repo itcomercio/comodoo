@@ -96,6 +96,7 @@ done
 # syslinux related stuff.
 #
 ./_mk-bootdisk.sh
+[ $? = 1 ] && exit 1
 
 #
 # final ISO cd image.

@@ -531,7 +531,7 @@ class WelcomeWindow:
                                 "This installation will delete all your disk data."
                                 "All disk partitions will be erased and formated."
                                 "\n\n")
-                                % ("BEETLE POS Ameba", ),
+                                % ("REDOOP Appliance System", ),
                                 buttons = (_("OK"),), width = 50,
 				help = "welcome")
 
@@ -585,7 +585,7 @@ class AmebaInstaller:
         wellcome(self.screen, 0)
 
     def drawMainFrame(self):
-        productArch = "Wincor Nixdorf BEETLE POS system"
+        productArch = "Redoop Appliance System"
         self.screen.drawRootText (0, 0, self.screen.width * " ")
         self.screen.drawRootText (0, 0,
             _("Welcome to %s for %s") % (productName, productArch,))

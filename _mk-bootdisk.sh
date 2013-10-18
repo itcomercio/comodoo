@@ -743,7 +743,7 @@ cd -
 echo_note "WARNING" "Creating SQUASHFS with install.img"
 makemainimage "install" "squashfs"
 echo_note "OK" "[OK]"
-[ $? = 0 ] || exit 1
+[ $? = 0 ] || exit 0
 
 }
 
@@ -1019,6 +1019,12 @@ done
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "kernel modules population for initrd image ..."
+
+if [ -z ${ROOTFS} ]; then
+	echo_note "ERROR" "ERROR: BSP image is no available. Abort!"
+	exit 1
+fi
+
 mkdir yocto/tmp
 mkdir -p yocto/tmp2/lib
 tar xvzf yocto/${ROOTFS} -C yocto/tmp &>> ${TOP_DIR}/logs/modules
