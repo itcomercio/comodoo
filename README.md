@@ -1,8 +1,4 @@
-rosi: Redoop Operating System Installer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-This file is a logbook of "rosi" development from the more
-early phases.
+# Yocto BSP installer for hard drive based devices
 
 - Project kick-off
 
