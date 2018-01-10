@@ -75,6 +75,7 @@ static struct nl_handle *_iface_get_handle(void) {
 
 /*
  * Return an NETLINK_ROUTE cache.
+ * https://bugzilla.redhat.com/show_bug.cgi?id=886862
  */
 static struct nl_cache *_iface_get_link_cache(struct nl_handle **handle) {
     struct nl_cache *cache = NULL;

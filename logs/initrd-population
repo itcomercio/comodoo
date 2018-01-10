@@ -1,0 +1,79 @@
+DSO_DEPS for /usr/bin/awk are  /lib64/libsigsegv.so.2 /lib64/libreadline.so.6 /lib64/libmpfr.so.4 /lib64/libgmp.so.10 /lib64/libdl.so.2 /lib64/libm.so.6 /lib64/libc.so.6 /lib64/libtinfo.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/bash are  /lib64/libtinfo.so.6 /lib64/libdl.so.2 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/cat are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/checkisomd5 are  /lib64/libpopt.so.0 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/chmod are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/cp are  /lib64/libselinux.so.1 /lib64/libacl.so.1 /lib64/libattr.so.1 /lib64/libc.so.6 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/bin/cpio are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/cut are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/dd are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/df are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/dhclient are  /lib64/libomapi.so.0 /lib64/libcap-ng.so.0 /usr/lib64/bind99/libirs-export.so.91 /usr/lib64/bind99/libdns-export.so.173 /usr/lib64/bind99/libisccfg-export.so.94 /usr/lib64/bind99/libisc-export.so.108 /lib64/libsystemd.so.0 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2 /lib64/libgssapi_krb5.so.2 /lib64/libkrb5.so.3 /lib64/libk5crypto.so.3 /lib64/libcom_err.so.2 /lib64/libcrypto.so.10 /lib64/libcap.so.2 /lib64/libpthread.so.0 /lib64/libxml2.so.2 /lib64/libz.so.1 /lib64/liblzma.so.5 /lib64/libm.so.6 /lib64/libdl.so.2 /lib64/libresolv.so.2 /lib64/libselinux.so.1 /lib64/librt.so.1 /lib64/liblz4.so.1 /lib64/libgcrypt.so.20 /lib64/libgpg-error.so.0 /lib64/libgcc_s.so.1 /lib64/libkrb5support.so.0 /lib64/libkeyutils.so.1 /lib64/libpcre.so.1
+DSO_DEPS for /usr/bin/dmesg are  /lib64/libtinfo.so.6 /lib64/librt.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/echo are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/eject are  /lib64/libmount.so.1 /lib64/libblkid.so.1 /lib64/libuuid.so.1 /lib64/libselinux.so.1 /lib64/librt.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/bin/env are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/grep are  /lib64/libpcre.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/ifconfig are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/insmod are  /lib64/liblzma.so.5 /lib64/libz.so.1 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/mount.nfs are 
+DSO_DEPS for /usr/bin/kill are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/less are  /lib64/libtinfo.so.6 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/ln are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/ls are  /lib64/libselinux.so.1 /lib64/libcap.so.2 /lib64/libc.so.6 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/bin/mkdir are  /lib64/libselinux.so.1 /lib64/libc.so.6 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/sbin/mkfs.ext3 are  /lib64/libext2fs.so.2 /lib64/libcom_err.so.2 /lib64/libblkid.so.1 /lib64/libuuid.so.1 /lib64/libe2p.so.2 /lib64/libdl.so.2 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/mknod are  /lib64/libselinux.so.1 /lib64/libc.so.6 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/sbin/modprobe are  /lib64/liblzma.so.5 /lib64/libz.so.1 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/more are  /lib64/libtinfo.so.6 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/mount are 
+DSO_DEPS for /usr/bin/mv are  /lib64/libselinux.so.1 /lib64/libacl.so.1 /lib64/libattr.so.1 /lib64/libc.so.6 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+install: target '/bin/nash/' is not a directory: No such file or directory
+env: '/tmp/rosi-25389.mk-bootdisk/initrd': Permission denied
+DSO_DEPS for /tmp/rosi-25389.mk-bootdisk/initrd are 
+mkdir: cannot create directory '/bin/nash': Permission denied
+./_mk-bootdisk.sh: line 255: pushd: /bin/nash/lib: No such file or directory
+./_mk-bootdisk.sh: line 270: popd: directory stack empty
+DSO_DEPS for /usr/bin/rm are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/rmmod are  /lib64/liblzma.so.5 /lib64/libz.so.1 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/route are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/sed are  /lib64/libacl.so.1 /lib64/libselinux.so.1 /lib64/libc.so.6 /lib64/libattr.so.1 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/sbin/sfdisk are  /lib64/libfdisk.so.1 /lib64/libblkid.so.1 /lib64/libsmartcols.so.1 /lib64/libtinfo.so.6 /lib64/libuuid.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/sleep are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/sort are  /lib64/libcrypto.so.10 /lib64/libpthread.so.0 /lib64/libc.so.6 /lib64/libdl.so.2 /lib64/libz.so.1 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/strace are  /lib64/libunwind-x86_64.so.8 /lib64/libunwind.so.8 /lib64/libc.so.6 /lib64/libgcc_s.so.1 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/sync are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/tree are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/umount are 
+DSO_DEPS for /usr/bin/uniq are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/ps are  /lib64/libprocps.so.4 /lib64/libsystemd.so.0 /lib64/libdl.so.2 /lib64/libc.so.6 /lib64/libresolv.so.2 /lib64/libselinux.so.1 /lib64/libcap.so.2 /lib64/librt.so.1 /lib64/libm.so.6 /lib64/liblzma.so.5 /lib64/liblz4.so.1 /lib64/libgcrypt.so.20 /lib64/libgpg-error.so.0 /lib64/libgcc_s.so.1 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2 /lib64/libpcre.so.1
+DSO_DEPS for /usr/bin/gdb are  /lib64/libreadline.so.6 /lib64/libz.so.1 /lib64/libdl.so.2 /lib64/libselinux.so.1 /lib64/libncursesw.so.6 /lib64/libtinfo.so.6 /lib64/libguile-2.0.so.22 /lib64/libgc.so.1 /lib64/libpthread.so.0 /lib64/libutil.so.1 /lib64/libm.so.6 /lib64/libpython3.5m.so.1.0 /lib64/libexpat.so.1 /lib64/liblzma.so.5 /lib64/libbabeltrace.so.1 /lib64/libbabeltrace-ctf.so.1 /lib64/libipt.so.1 /lib64/libstdc++.so.6 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2 /lib64/libpcre.so.1 /lib64/libffi.so.6 /lib64/libunistring.so.2 /lib64/libgmp.so.10 /lib64/libltdl.so.7 /lib64/libcrypt.so.1 /lib64/libatomic_ops.so.1 /lib64/libdw.so.1 /lib64/libelf.so.1 /lib64/libpopt.so.0 /lib64/libgmodule-2.0.so.0 /lib64/libglib-2.0.so.0 /lib64/libuuid.so.1 /lib64/libfreebl3.so /lib64/libbz2.so.1
+DSO_DEPS for /usr/bin/netstat are  /lib64/libselinux.so.1 /lib64/libc.so.6 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/ld-linux-x86-64.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/bin/test are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/bin/less are  /lib64/libtinfo.so.6 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/blockdev are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/chroot are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/dmsetup are  /lib64/libdevmapper.so.1.02 /lib64/librt.so.1 /lib64/libsystemd.so.0 /lib64/libc.so.6 /lib64/libselinux.so.1 /lib64/libsepol.so.1 /lib64/libudev.so.1 /lib64/libpthread.so.0 /lib64/libm.so.6 /lib64/libresolv.so.2 /lib64/libcap.so.2 /lib64/liblzma.so.5 /lib64/liblz4.so.1 /lib64/libgcrypt.so.20 /lib64/libdl.so.2 /lib64/libgpg-error.so.0 /lib64/libgcc_s.so.1 /lib64/ld-linux-x86-64.so.2 /lib64/libpcre.so.1
+DSO_DEPS for /usr/bin/eject are  /lib64/libmount.so.1 /lib64/libblkid.so.1 /lib64/libuuid.so.1 /lib64/libselinux.so.1 /lib64/librt.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/sbin/fdisk are  /lib64/libfdisk.so.1 /lib64/libblkid.so.1 /lib64/libsmartcols.so.1 /lib64/libtinfo.so.6 /lib64/libuuid.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+install: target '/sbin/grub/' is not a directory: No such file or directory
+env: '/tmp/rosi-25389.mk-bootdisk/initrd': Permission denied
+DSO_DEPS for /tmp/rosi-25389.mk-bootdisk/initrd are 
+mkdir: cannot create directory '/sbin/grub': Permission denied
+./_mk-bootdisk.sh: line 255: pushd: /sbin/grub/lib: No such file or directory
+./_mk-bootdisk.sh: line 270: popd: directory stack empty
+DSO_DEPS for /usr/sbin/insmod are  /lib64/liblzma.so.5 /lib64/libz.so.1 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+install: target '/sbin/killall5/' is not a directory: No such file or directory
+env: '/tmp/rosi-25389.mk-bootdisk/initrd': Permission denied
+DSO_DEPS for /tmp/rosi-25389.mk-bootdisk/initrd are 
+mkdir: cannot create directory '/sbin/killall5': Permission denied
+./_mk-bootdisk.sh: line 255: pushd: /sbin/killall5/lib: No such file or directory
+./_mk-bootdisk.sh: line 270: popd: directory stack empty
+DSO_DEPS for /usr/sbin/losetup are  /lib64/libsmartcols.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/lsmod are  /lib64/liblzma.so.5 /lib64/libz.so.1 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/mke2fs are  /lib64/libext2fs.so.2 /lib64/libcom_err.so.2 /lib64/libblkid.so.1 /lib64/libuuid.so.1 /lib64/libe2p.so.2 /lib64/libdl.so.2 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/mkfs are  /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/mkfs.ext2 are  /lib64/libext2fs.so.2 /lib64/libcom_err.so.2 /lib64/libblkid.so.1 /lib64/libuuid.so.1 /lib64/libe2p.so.2 /lib64/libdl.so.2 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/mkfs.ext3 are  /lib64/libext2fs.so.2 /lib64/libcom_err.so.2 /lib64/libblkid.so.1 /lib64/libuuid.so.1 /lib64/libe2p.so.2 /lib64/libdl.so.2 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2
+DSO_DEPS for /usr/sbin/mkswap are  /lib64/libuuid.so.1 /lib64/libblkid.so.1 /lib64/libselinux.so.1 /lib64/libc.so.6 /lib64/ld-linux-x86-64.so.2 /lib64/libpcre.so.1 /lib64/libdl.so.2 /lib64/libpthread.so.0
+DSO_DEPS for /usr/sbin/modprobe are  /lib64/liblzma.so.5 /lib64/libz.so.1 /lib64/libgcc_s.so.1 /lib64/libc.so.6 /lib64/libpthread.so.0 /lib64/ld-linux-x86-64.so.2

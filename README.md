@@ -17,15 +17,16 @@ $ git checkout --track -b f10-branch origin/f10-branch
 
 - Minimal packages in Fedora based distro:
 
-$ yum install libnl-devel isomd5sum-devel NetworkManager-devel audit-libs-devel squashfs-tools
-
-- Minimal packages in Ubuntu based distro:
-
-$ sudo apt-get install \
-	network-manager-dev libdbus-1-dev libnl1 libnl-dev libpopt-dev e2fslibs-dev \
-	libzip-dev libdevmapper-dev libblkid-dev libaudit-dev python-dev \
-	libnewt-dev policycoreutils dracut grub hal libsqlite3-dev squashfs-tools \
-	python-newt python-parted libx11-dev libdmraid-dev 
+$ sudo dnf install audit-libs-devel \
+isomd5sum-devel \
+NetworkManager-devel \
+squashfs-tools \
+e2fsprogs-devel \
+popt-devel \
+libblkid-devel \
+libX11-devel \
+libnl3-devel \
+newt-devel
 
 - Instructions:
 

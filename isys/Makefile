@@ -19,7 +19,7 @@
 
 include ../Makefile.inc
 
-CFLAGS +=  -I$(PYTHONINCLUDE) -I.. -DHAVE_NFS
+CFLAGS +=  -I$(PYTHONINCLUDE) -I..
 
 OBJECTS = devices.o imount.o smp.o cpio.o uncpio.o dasd.o \
           lang.o isofs.o linkdetect.o vio.o \
@@ -43,8 +43,8 @@ LOADLIBES += $(shell pkg-config --libs NetworkManager)
 CFLAGS    += $(shell pkg-config --cflags NetworkManager)
 
 # libnl
-LOADLIBES += $(shell pkg-config --libs libnl-1)
-CFLAGS    += $(shell pkg-config --cflags libnl-1)
+LOADLIBES += $(shell pkg-config --libs libnl-3.0)
+CFLAGS    += $(shell pkg-config --cflags libnl-3.0)
 
 ifeq ($(ARCH),ppc)
 OBJECTS += minifind.o

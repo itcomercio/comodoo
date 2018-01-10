@@ -24,7 +24,7 @@
 
 #include <resolv.h>
 #include <net/if.h>
-#include <netlink/cache.h>
+#include <libnl3/netlink/cache.h>
 #include <netlink/socket.h>
 
 #include <dbus/dbus.h>

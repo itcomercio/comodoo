@@ -27,7 +27,7 @@
 # FIXME:
 # Only we can run being superuser, by now.
 
-[ `id -u` != "0" ] && echo "You must be root!" && exit
+#[ `id -u` != "0" ] && echo "You must be root!" && exit
 
 usage () {
     echo "usage: mk-installer.sh [<cleanall>]"

@@ -1,0 +1,20 @@
+Redoop installer utility. Setup:
+
+TOP_DIR      = /home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git
+TESTING      = 
+DEBUG        = 1
+TMPDIR       = /tmp
+MKB_DIR      = /tmp/rosi-25389.mk-bootdisk/initrd
+MKB_SYSLINUX = /tmp/rosi-25389.mk-bootdisk/syslinux
+MKB_FSIMAGE  = /tmp/rosi-25389.mk-bootdisk/initrdimage
+MKB_BOOTTREE = CD
+TOPDESTPATH  = CD
+INSTIMGPATH  = CD/images
+IMGPATH      = /tmp/dir
+IMAGEUUID    = 201801101237.x86_64
+PRODUCT      = Redoop
+VERSION      = 1
+BZIMAGE      = 
+ROOTFS       = 
+MODULES      = 
+DISTRO       = Fedora

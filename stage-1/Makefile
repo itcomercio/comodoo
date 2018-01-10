@@ -33,8 +33,8 @@ LIBS   += $(shell pkg-config --libs devmapper)
 CFLAGS += $(shell pkg-config --cflags devmapper)
 
 # libnl
-LIBS   += $(shell pkg-config --libs libnl-1)
-CFLAGS += $(shell pkg-config --cflags libnl-1)
+LIBS   += $(shell pkg-config --libs libnl-3.0)
+CFLAGS += $(shell pkg-config --cflags libnl-3.0)
 
 # NetworkManager
 CFLAGS += $(shell pkg-config --cflags NetworkManager)
