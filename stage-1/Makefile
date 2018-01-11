@@ -36,6 +36,10 @@ CFLAGS += $(shell pkg-config --cflags devmapper)
 LIBS   += $(shell pkg-config --libs libnl-3.0)
 CFLAGS += $(shell pkg-config --cflags libnl-3.0)
 
+# libnl-route
+LIBS   += $(shell pkg-config --libs libnl-route-3.0)
+CFLAGS += $(shell pkg-config --cflags libnl-route-3.0)
+
 # NetworkManager
 CFLAGS += $(shell pkg-config --cflags NetworkManager)
 
@@ -77,13 +81,7 @@ LIBS +=
 CFLAGS += -DUSE_LOGDEV -DVERSION='"$(VERSION)"' -g
 REALCC=gcc
 
-# linuxrc + shutdown on s390, init everywhere else
-ifneq (,$(filter s390 s390x,$(ARCH)))
-BINS += linuxrc.s390 shutdown
-SHUTDOWNOPTS = -DAS_SHUTDOWN=1
-else
 BINS += init
-endif
 
 # translation stuff
 LANGS = $(shell cut -f 2 ../addons/lang-table | egrep -v '(^en$$)')
@@ -93,7 +91,7 @@ TRFILES = $(patsubst %,%.tr,$(LANGS))
 
 all: $(BINS) loader.tr
 
-loader.tr: $(TR) ../lang-table
+loader.tr: $(TR) ../addons/lang-table
 	(cd tr; ls $(TRFILES) | cpio --quiet -Hcrc -o |gzip -9) > $@
 
 tr/%.tr: ../po/%.po loader.po

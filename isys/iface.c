@@ -19,6 +19,11 @@
  * Author(s): David Cantrell <dcantrell@redhat.com>
  */
 
+/*
+ * Reference:
+ * https://www.infradead.org/~tgr/libnl/doc/core.html
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -50,23 +55,23 @@
 #include "str.h"
 
 /* Internal-only function prototypes. */
-static struct nl_handle *_iface_get_handle(void);
-static struct nl_cache *_iface_get_link_cache(struct nl_handle **);
+static struct nl_sock *_iface_get_handle(void);
+static struct nl_cache *_iface_get_link_cache(struct nl_sock **);
 static int _iface_have_valid_addr(void *addr, int family, int length);
 static int _iface_redirect_io(char *device, int fd, int mode);
 
 /*
  * Return a libnl handle for NETLINK_ROUTE.
  */
-static struct nl_handle *_iface_get_handle(void) {
-    struct nl_handle *handle = NULL;
+static struct nl_sock *_iface_get_handle(void) {
+    struct nl_sock *handle = NULL;
 
-    if ((handle = nl_handle_alloc()) == NULL) {
+    if ((handle = nl_socket_alloc()) == NULL) {
         return NULL;
     }
 
     if (nl_connect(handle, NETLINK_ROUTE)) {
-        nl_handle_destroy(handle);
+        nl_socket_free(handle);
         return NULL;
     }
 
@@ -77,16 +82,16 @@ static struct nl_handle *_iface_get_handle(void) {
  * Return an NETLINK_ROUTE cache.
  * https://bugzilla.redhat.com/show_bug.cgi?id=886862
  */
-static struct nl_cache *_iface_get_link_cache(struct nl_handle **handle) {
-    struct nl_cache *cache = NULL;
+static struct nl_cache *_iface_get_link_cache(struct nl_sock **handle) {
+    struct nl_cache **cache = NULL;
 
     if ((*handle = _iface_get_handle()) == NULL) {
         return NULL;
     }
 
-    if ((cache = rtnl_link_alloc_cache(*handle)) == NULL) {
+    if ((cache = rtnl_link_alloc_cache(*handle, AF_UNSPEC, cache)) == NULL) {
         nl_close(*handle);
-        nl_handle_destroy(*handle);
+        nl_socket_free(*handle);
         return NULL;
     }
 
@@ -297,7 +302,7 @@ char *iface_ip2str(char *ifname, int family) {
 char *iface_mac2str(char *ifname) {
     int buflen = 20;
     char *buf = NULL;
-    struct nl_handle *handle = NULL;
+    struct nl_sock *handle = NULL;
     struct nl_cache *cache = NULL;
     struct rtnl_link *link = NULL;
     struct nl_addr *addr = NULL;
@@ -327,12 +332,12 @@ char *iface_mac2str(char *ifname) {
     }
 
 mac2str_error4:
-    nl_addr_destroy(addr);
+    nl_addr_put(addr);
 mac2str_error3:
     rtnl_link_put(link);
 mac2str_error2:
     nl_close(handle);
-    nl_handle_destroy(handle);
+    nl_socket_free(handle);
 
     return buf;
 }
@@ -573,7 +578,7 @@ int iface_start_NetworkManager(DBusConnection *connection, char **error) {
  */
 int iface_set_interface_mtu(char *ifname, int mtu) {
     int ret = 0;
-    struct nl_handle *handle = NULL;
+    struct nl_sock *handle = NULL;
     struct nl_cache *cache = NULL;
     struct rtnl_link *link = NULL;
     struct rtnl_link *request = NULL;
@@ -607,7 +612,7 @@ ifacemtu_error2:
     rtnl_link_put(link);
 ifacemtu_error1:
     nl_close(handle);
-    nl_handle_destroy(handle);
+    nl_socket_free(handle);
 
     return ret;
 }

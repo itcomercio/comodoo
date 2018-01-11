@@ -22,7 +22,8 @@ popt-devel \
 libblkid-devel \
 libX11-devel \
 libnl3-devel \
-newt-devel
+newt-devel \
+device-mapper-devel
 
 - Instructions:
 
