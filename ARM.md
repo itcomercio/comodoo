@@ -113,3 +113,24 @@ https://en.wikipedia.org/wiki/List_of_ARM_microarchitectures
 # ABI for the ARM Architecture
 
 http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.subset.swdev.abi/index.html
+
+# POS Prototype
+
+The POS IZP037 is a Rockchip RK3288 board.
+
+It is a Quad-core ARM Cortex-A17 MCore processor with separately NEON
+coprocessor. A full implementation of ARM architecture v7-A instruction set,
+ARM Neon Advanced SIMD (single instruction, multiple data) support.
+
+This architecture fit in the armv7hl architectures of Linux distribution
+vendors, such as Fedora ARM distributions. Armv7hl (hard floating point with 
+aapcs-linux ABI, for armv7).
+
+https://en.wikipedia.org/wiki/ARM_Cortex-A17
+https://developer.arm.com/products/processors/cortex-a/cortex-a17
+https://fedoraproject.org/wiki/Architectures/ARM
+https://lwn.net/Articles/463506/
+http://www.informit.com/articles/article.aspx?p=1620207&seqNum=4
+
+
+
