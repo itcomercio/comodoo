@@ -22,7 +22,7 @@ This development boards by ARM can be emulated with QEMUN.
 ## Download and extraction
 
 ```
-sudo dnf install -y libguestfs-tools virt-install
+sudo dnf install -y qemu libguestfs-tools virt-install
 
 curl -OL http://ftp.cica.es/fedora/linux/releases/26/Spins/armhfp/images/Fedora-Minimal-armhfp-26-1.5-sda.raw.xz
 unxz Fedora-Minimal-armhfp-26-1.5-sda.raw.xz 
@@ -42,7 +42,7 @@ sudo mv Fedora-Minimal-armhfp-26-1.5-sda.raw \
   machine type should be selected automatically
 * Select the 'Import install' option, go to the next page
 * Browse to the disk image, kernel, and initrd we moved in the previous step.
-* Set kernel args as: console=ttyAMA0 rw root=LABEL=_/ rootwait
+* Set kernel args as: console=ttyAMA0 rw root=LABEL=________/ rootwait
 
 ## Installing using 'virt-install' (command line)
 
@@ -56,6 +56,16 @@ sudo virt-install \
         --os-variant fedora26 \
         --disk $LIBVIRTPATH/images/Fedora-Minimal-armhfp-26-1.5-sda.raw \
         --boot kernel=$LIBVIRTPATH/vmlinuz-4.11.8-300.fc26.armv7hl,initrd=$LIBVIRTPATH/initramfs-4.11.8-300.fc26.armv7hl.img,kernel_args="console=ttyAMA0 rw root=LABEL=_/ rootwait" 
+```
+
+### Expanding the Disk Image
+
+With the VM shutoff:
+
+```
+sudo qemu-img resize -f raw /var/lib/libvirt/images/Fedora-Minimal-armhfp-26-1.5-sda.raw +10G
+vm # growpart /dev/sda 4
+vm # resize2fs /dev/sda4
 ```
 
 ## Troubleshooting Note
@@ -78,10 +88,28 @@ often resolved by rebooting the system.
 
 https://github.com/vagrant-libvirt/vagrant-libvirt/issues/748
 
+https://www.vagrantup.com/docs/boxes/base.html
+https://unix.stackexchange.com/questions/222427/how-to-create-custom-vagrant-box-from-libvirt-kvm-instance
+
+```
+cp /var/lib/libvirt/images/Fedora-Minimal-armhfp-26-1.5-sda.raw workingdir/
+cd workingdir
+qemu-img convert -f raw -O qcow2 Fedora-Minimal-armhfp-26-1.5-sda.raw Fedora-Minimal-armhfp-26-1.5.qcow2
+$HOME/.vagrant.d/gems/2.4.2/gems/vagrant-libvirt-0.0.40/tools/create_box.sh Fedora-Minimal-armhfp-26-1.5.qcow2
+
+==> Creating box, tarring and gzipping     
+./metadata.json                            
+./Vagrantfile                              
+./box.img
+Total bytes written: 1389240320 (1.3GiB, 20MiB/s)
+==> Fedora-Minimal-armhfp-26-1.5.box created
+==> You can now add the box:
+==>   'vagrant box add Fedora-Minimal-armhfp-26-1.5.box --name Fedora-Minimal-armhfp-26-1.5'
+```
+
 # List of ARM microarchitectures
 
 https://en.wikipedia.org/wiki/List_of_ARM_microarchitectures
-
 # ABI for the ARM Architecture
 
 http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.subset.swdev.abi/index.html

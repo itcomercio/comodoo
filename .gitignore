@@ -21,3 +21,4 @@ loader.tr
 cscope*
 a.out
 loader.po
+.vagrant
