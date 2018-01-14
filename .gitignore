@@ -22,3 +22,4 @@ cscope*
 a.out
 loader.po
 .vagrant
+installer/logs/*

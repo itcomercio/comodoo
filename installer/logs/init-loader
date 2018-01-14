@@ -1,6 +1,0 @@
-install: cannot stat '///home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git/stage-1/init': No such file or directory
-env: '/home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git/stage-1/init': No such file or directory
-DSO_DEPS for /home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git/stage-1/init are 
-install: cannot stat '///home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git/stage-1/loader': No such file or directory
-env: '/home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git/stage-1/loader': No such file or directory
-DSO_DEPS for /home/javierroman/HACK/dev/javiroman-github/javiroman/comodoo-org/installer-comodoo.git/stage-1/loader are 

@@ -132,5 +132,13 @@ https://fedoraproject.org/wiki/Architectures/ARM
 https://lwn.net/Articles/463506/
 http://www.informit.com/articles/article.aspx?p=1620207&seqNum=4
 
+# GCC Optimization for ARM
+
+https://gist.github.com/fm4dd/c663217935dc17f0fc73c9c81b0aa845
+https://community.arm.com/tools/b/blog/posts/arm-cortex-a-processors-and-gcc-command-lines
+https://www.raspberrypi.org/forums/viewtopic.php?t=107203
+https://stackoverflow.com/questions/29428726/selecting-appropriate-arm-mfpu-option-in-gcc-based-on-cpu-features
+https://popolon.org/gblog3/?p=261&lang=en
+https://www.cnx-software.com/2011/04/22/compile-with-arm-thumb2-reduce-memory-footprint-and-improve-performance/
 
 

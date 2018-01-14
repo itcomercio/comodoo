@@ -3,15 +3,11 @@
 - Project kick-off
 
 Originally this installer was based on Anaconda installer, 
-from Fedora 10 branch:
-
-$ cat /etc/fedora-release 
-Fedora release 10 (Cambridge)
-
-$ git clone git://git.fedorahosted.org/git/anaconda.git anaconda.git
-$ git checkout --track -b f10-branch origin/f10-branch
+from Fedora 10 branch.
 
 - Minimal packages in Fedora based distro:
+
+$ sudo dnf group install "Development Tools"
 
 $ sudo dnf install audit-libs-devel \
 isomd5sum-devel \
@@ -23,13 +19,18 @@ libblkid-devel \
 libX11-devel \
 libnl3-devel \
 newt-devel \
-device-mapper-devel
-
-- Instructions:
-
-$ cd anaconda.git 
-$ make -C isys/
-$ make -C loader/
+device-mapper-devel \
+python \
+python-devel \
+zlib-devel \
+redhat-lsb-core \
+dmraid-devel \
+net-tools \
+nfs-utils \
+strace \
+tree \
+gdb \
+grub2-tools \
 
 #
 # Early phase-0
@@ -103,7 +104,7 @@ libcap-2.10-2.fc10.i386 ==> Library for getting and setting POSIX.1e capabilitie
 
 
 --
-  Javi Roman <javiroman@redoop.org>
+  Javi Roman <javiroman@comodoo.org>
 
 
 
