@@ -141,4 +141,6 @@ https://stackoverflow.com/questions/29428726/selecting-appropriate-arm-mfpu-opti
 https://popolon.org/gblog3/?p=261&lang=en
 https://www.cnx-software.com/2011/04/22/compile-with-arm-thumb2-reduce-memory-footprint-and-improve-performance/
 
+# Installation Notes
 
+https://github.com/sorki/fedora-arm-installer
