@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #
-# ROSI: Redoop OS Installer based on
+# Comodoo POS OS Installer based on
 # the Red Hat Linux Installation program anaconda.
 #
-# Copyright (C) 2013 Redoop.org  All rights reserved.
+# Copyright (C) 2018 Comodoo.org  All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@
 #   - only ext3 formating
 #   - dump of rootfs from OpenEmbedded BSP.
 #
-# ROSI Author(s):
-#	    Javi Roman <javiroman@redoop.org>
+# Author(s):
+# Javi Roman <javiroman@comodoo.org>
 #
 import sys
 import os
@@ -531,7 +531,7 @@ class WelcomeWindow:
                                 "This installation will delete all your disk data."
                                 "All disk partitions will be erased and formated."
                                 "\n\n")
-                                % ("REDOOP Appliance System", ),
+                                % ("COMODOO Appliance System", ),
                                 buttons = (_("OK"),), width = 50,
 				help = "welcome")
 
@@ -585,7 +585,7 @@ class AmebaInstaller:
         wellcome(self.screen, 0)
 
     def drawMainFrame(self):
-        productArch = "Redoop Appliance System"
+        productArch = "Comodoo Appliance System"
         self.screen.drawRootText (0, 0, self.screen.width * " ")
         self.screen.drawRootText (0, 0,
             _("Welcome to %s for %s") % (productName, productArch,))
@@ -662,7 +662,7 @@ class AmebaInstaller:
 
     def transferBSP(self):
         w = WaitWindow(self.screen, "Preparing BSP installation", 
-            "Loading Redoop BSP, wait please ...")
+            "Loading Comodoo BSP, wait please ...")
 
         tb = BspImage(BSPFILE, INSTALLDEST, self.targetdisk)
         tb.loadBsp()

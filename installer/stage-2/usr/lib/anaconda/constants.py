@@ -45,7 +45,7 @@ hiddenmenu
 default=0
 timeout=5
 
-title Redoop Operating System by Redoop.org
+title Comodoo Operating System by Comodoo.org
         root (hd0,0)
         kernel /bzImage ro root=%s3 agp=off
 """

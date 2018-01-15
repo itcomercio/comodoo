@@ -1,10 +1,10 @@
 BINS="bzImage-romley.bin \
-core-image-redoop-romley.tar.gz \
+core-image-comodoo-romley.tar.gz \
 modules-*"
 
 BUILD_HOST="BaldCompiler.cloud.cediant.es"
 
-DEPLOY_PATH="/home/jroman/redoop-poky/build/tmp/deploy/images"
+DEPLOY_PATH="/home/jroman/comodoo-poky/build/tmp/deploy/images"
 
 rm $BINS modules.tar.gz 2> /dev/null
 

@@ -19,7 +19,7 @@ welcome() {
 	echo "--------------------------------------------------"
 	echo "           Automatic Install Disk Utility         "
 	echo "                                                  "
-	echo " (c) 2008 Javi Roman <javiroman@redoop.org>  "
+	echo " (c) 2018 Javi Roman <javiroman@comodoo.org>  "
 	echo "                                                  "
 	echo "--------------------------------------------------"
 	echo

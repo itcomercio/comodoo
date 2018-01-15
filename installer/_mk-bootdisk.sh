@@ -2,8 +2,8 @@
 #
 # mk-bootdisk.sh
 #
-# Copyright (C) 2013  Redoop.org All rights reserved.
-# Javi Roman <javiroman@redoop.org>
+# Copyright (C) 2013  Comodoo.org All rights reserved.
+# Javi Roman <javiroman@comodoo.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@ TOP_DIR=$PWD
 TMPDIR=${TMPDIR:-/tmp}
 
 # temporal folders for stage-1 (initrd.img)
-MKB_DIR=$TMPDIR/rosi-$$.mk-bootdisk/initrd
-MKB_SYSLINUX=$TMPDIR/rosi-$$.mk-bootdisk/syslinux
-MKB_FSIMAGE=$TMPDIR/rosi-$$.mk-bootdisk/initrdimage
+MKB_DIR=$TMPDIR/comodoo-$$.mk-bootdisk/initrd
+MKB_SYSLINUX=$TMPDIR/comodoo-$$.mk-bootdisk/syslinux
+MKB_FSIMAGE=$TMPDIR/comodoo-$$.mk-bootdisk/initrdimage
 MKB_BOOTTREE=CD
 
 # temporal folders for stage-2 (install.img)
@@ -51,7 +51,7 @@ IMGPATH=/tmp/dir
 
 # .buildstamp file: Architecture, product name, product version.
 IMAGEUUID=$(date +%Y%m%d%H%M).$(uname -i)
-PRODUCT="Redoop"
+PRODUCT="Comodoo"
 VERSION="1"
 DSO_DEPS=""
 LDSO=""
@@ -67,7 +67,7 @@ DISTRO=`lsb_release -irc | grep ID | cut -d':' -f2 | tr -d [[:space:]]`
 rm -fr ${TOP_DIR}/logs
 mkdir ${TOP_DIR}/logs
 cat <<! > logs/setup
-Redoop installer utility. Setup:
+Comodoo installer utility. Setup:
 
 TOP_DIR      = $TOP_DIR
 TESTING      = $TESTING
@@ -615,17 +615,20 @@ PKGDEST=/tmp/dir
 mkdir $PKGDEST
 echo_note "WARNING" "populate $PKGDEST ..."
 
+# TODO: nash missing
 # core linux utils population
 INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
-kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv nash \
+kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
 ps gdb netstat test less"
 
-INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk grub \
-insmod killall5 losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
-modprobe nash parted partprobe pidof reboot sfdisk shutdown ip \
-udevd udevadm udevsettle udevtrigger consoletype logger"
+# TODO: nash missing
+# TODO: grub missing
+INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk \
+insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
+modprobe parted partprobe pidof reboot sfdisk shutdown ip \
+udevadm consoletype logger"
 
 for i in $INSTALL_BIN
 do
@@ -803,10 +806,10 @@ upd_anaconda() {
 # Zero stage population (stage-0): syslinux phase
 #
 echo_note "WARNING" "Old temporary files housekepping ..."
-rm -fr $TMPDIR/rosi-* 2> /dev/null
+rm -fr $TMPDIR/comodoo-* 2> /dev/null
 rm -fr $TMPDIR/dir 2> /dev/null
 rm -rf $MKB_DIR  2> /dev/null
-rm -fr $TMPDIR/rosi-* 2> /dev/null
+rm -fr $TMPDIR/comodoo-* 2> /dev/null
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "Making folder scheme ..."
@@ -918,16 +921,19 @@ cp pyblock/dmmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmmodule.so
 cp pyblock/dmraidmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmraidmodule.so
 
 # core linux utils population
+# TODO: nash missing
 INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
-kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv nash \
+kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
 ps gdb netstat test less"
 
-INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk grub \
-insmod killall5 losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
-modprobe nash parted partprobe pidof reboot sfdisk shutdown ip \
-udevd udevadm udevsettle udevtrigger consoletype logger"
+# TODO: nash missing
+# TODO: grub missing
+INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk \
+insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
+modprobe parted partprobe pidof reboot sfdisk shutdown ip \
+udevadm consoletype logger"
 
 
 echo_note "WARNING" "$MKB_DIR population ..."

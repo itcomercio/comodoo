@@ -487,7 +487,7 @@ int main(int argc, char **argv) {
 
     printstr("\nGreetings.\n");
 
-    printf("Redoop installer init version %s starting\n", VERSION);
+    printf("Comodoo installer init version %s starting\n", VERSION);
 
     printf("mounting /proc filesystem... "); 
     if (!testing) {
@@ -573,7 +573,7 @@ int main(int argc, char **argv) {
 #endif
     for (i = 0; consoles[i] != NULL; i++) {
         if ((fd = open(consoles[i], O_RDWR)) >= 0 && !tcgetattr(fd, &mode) && !termcmp(&cmode, &mode)) {
-            printf("Redoop installer init version %s using %s as console\n",
+            printf("Comodoo installer init version %s using %s as console\n",
                    VERSION, consoles[i]);
             isSerial = 3;
             console = strdup(consoles[i]);

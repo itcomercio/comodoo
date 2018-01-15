@@ -2,8 +2,8 @@
 #
 # mk-installer.sh
 #
-# Copyright (C) 2013 Redoop.org  All rights reserved.
-# Javi Roman <javiroman@redoop.org>
+# Copyright (C) 2013 Comodoo.org  All rights reserved.
+# Javi Roman <javiroman@comodoo.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -45,13 +45,13 @@ cleanall () {
 
     rm -fr CD
 
-    rm -fr /tmp/rosi-*
+    rm -fr /tmp/comodoo-*
     rm -fr /tmp/dir
     rm -fr /tmp/instimage*
     rm -fr /tmp/keepfile.*
 
     rm yocto/bzImage-romley.bin  
-    rm yocto/core-image-redoop-romley.tar.gz  
+    rm yocto/core-image-comodoo-romley.tar.gz  
     rm yocto/modules.tar.gz
 
     rm -fr logs
@@ -96,7 +96,7 @@ done
 # syslinux related stuff.
 #
 ./_mk-bootdisk.sh
-[ $? = 1 ] && exit 1
+[ $? = 1 ] && echo "ERROR Undefined, _mk-cdrom and _run-install skipped" && exit 1
 
 #
 # final ISO cd image.
