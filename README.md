@@ -32,7 +32,15 @@ tree \
 gdb \
 grub2-tools \
 parted-devel \
-parted-devel
+audit-libs-devel \
+e2fsprogs-devel \
+popt-devel \
+libblkid-devel \
+libnl3-devel \
+NetworkManager-glib-devel \
+device-mapper-devel \
+dmraid-devel \
+python2-dialog
 
 pip install pyparted
 

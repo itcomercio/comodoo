@@ -254,7 +254,7 @@ static int checkmd5sum(int isofd, char *mediasum, char *computedsum, checkCallba
                 j = (current_fragment-1)*FRAGMENT_SUM_LENGTH/fragmentcount;
                 for (i=0; i<FRAGMENT_SUM_LENGTH/fragmentcount; i++) {
                     char tmpstr[2];
-                    snprintf(tmpstr, 2, "%01x", fragmd5sum[i]);
+                    snprintf(tmpstr, 3, "%01x", fragmd5sum[i]);
                     strncat(computedsum, tmpstr, 2);
                     thisfragsum[i] = fragmentsums[j++];
                 }

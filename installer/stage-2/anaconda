@@ -1,32 +1,4 @@
-#!/usr/bin/python
-#
-# Comodoo POS OS Installer based on
-# the Red Hat Linux Installation program anaconda.
-#
-# Copyright (C) 2018 Comodoo.org  All rights reserved.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# This is a whole rewritied installer based on Anaconda installer:
-# This initial phase aims:
-#   - basic layout partitioning
-#   - only ext3 formating
-#   - dump of rootfs from OpenEmbedded BSP.
-#
-# Author(s):
-# Javi Roman <javiroman@comodoo.org>
-#
+#!/usr/bin/env python2
 import sys
 import os
 import time
@@ -44,6 +16,7 @@ _ = lambda x: gettext.ldgettext("anaconda", x)
 __version__ = "0.0.1"
 
 global log
+global options
 
 fstype2tool = {"ext3":("mkfs.ext3", "-v"), "swap":("mkswap", "-V1")}
 
@@ -73,7 +46,7 @@ def setupEnvironment():
     if os.environ.has_key("LD_PRELOAD"):
         del os.environ["LD_PRELOAD"]
 
-def parse_args():
+def parseArgs():
     usage = "usage: %prog [options]"
     version = "Installer version: %s" % __version__
 
@@ -83,32 +56,12 @@ def parse_args():
                       dest="verbose",
                       help="Set verbosity output")
 
-    parser.add_option("-a", "--attach",
-                      action="store",
-                      dest="attach",
-                      default="127.0.0.1",
-                      help="URL for attaching the web server")
-
-    parser.add_option("-p", "--port",
-                      action="store",
-                      dest="port",
-                      default="8080",
-                      help="URL for attaching the web server")
-
-    parser.add_option("-o", "--output",
-                      action="store",
-                      dest="output",
-                      default="/tmp/output.dat",
-                      help="File for data output")
+    parser.add_option("-d", "--devel",
+                      action="store_true",
+                      dest="devel",
+                      help="For simulations")
 
     (options, args) = parser.parse_args()
-
-    if options.verbose:
-        print("Verbose output enabled")
-
-    print("Enabled API rest at .%s:%s." % (options.attach,
-                                           options.port))
-    print("Enabled output to file: .%s." % options.output)
 
     return options
 
@@ -151,20 +104,20 @@ def setupLoggingFromOpts(opts):
 
 def enoughMemory():
     '''Minimal RAM for text mode installation, the only mode for us'''
+    if not options.devel:
+        if iutil.memInstalled() < MIN_RAM:
+            screen = SnackScreen()
+            ButtonChoiceWindow(screen, _('Fatal Error'),
+                                _('You do not have enough RAM to install %s '
+                                  'on this machine.\n'
+                                  '\n'
+                                  'Press <return> to reboot your system.\n')
+                               %(product.productName,),
+                               buttons = (_("OK"),))
+            screen.finish()
+            return 0
 
-    if iutil.memInstalled() < MIN_RAM:
-        screen = SnackScreen()
-        ButtonChoiceWindow(screen, _('Fatal Error'),
-                            _('You do not have enough RAM to install %s '
-                              'on this machine.\n'
-                              '\n'
-                              'Press <return> to reboot your system.\n')
-                           %(product.productName,),
-                           buttons = (_("OK"),))
-        screen.finish()
-        return 0
-    else:
-        return 1
+    return 1
 
 def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
                           progress = None, root = '/'):
@@ -618,7 +571,6 @@ class WaitWindow:
 
 class Installer:
     def __init__(self):
-        self._parse_args()
         self.targetdisk = None
         self.screen = dialog.Dialog(dialog="dialog")
         self.drawMainFrame()
@@ -774,17 +726,23 @@ def main():
 
 if __name__ == "__main__":
     setupPythonPath()
-    options = parse_args()
-
-    sys.exit()
+    options = parseArgs()
 
     # Custom imports here after custom paths enabled
-    import product
-    import iutil
-    import isys
-    import parted
-    import minihal
-    from constants import *
+    if not options.devel:
+        import product
+        import iutil
+        import isys
+        import parted
+        import minihal
+        from constants import *
+
+    if options.devel:
+        print("Devel mode enabled!")
+
+    if options.verbose:
+        print("Verbose mode enabled!")
+        print("logging file: /tmp/anaconda.log")
 
     logging.basicConfig(filename='/tmp/anaconda.log',level=logging.DEBUG)
     log = logging.getLogger("anaconda")

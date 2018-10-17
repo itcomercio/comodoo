@@ -192,7 +192,7 @@ int implantISOFile(char *fname, int supported, int forceit, int quiet, char **er
             MD5_Final(fragmd5sum, &fragmd5ctx);
             for (i=0; i<FRAGMENT_SUM_LENGTH/FRAGMENT_COUNT; i++) {
                 char tmpstr[2];
-                snprintf(tmpstr, 2, "%01x", fragmd5sum[i]);
+                snprintf(tmpstr, 3, "%01x", fragmd5sum[i]);
                 strncat(fragstr, tmpstr, 2);
             }
             /*  printf("\nFragment [%i]: %s\n", previous_fragment, fragstr);  */
