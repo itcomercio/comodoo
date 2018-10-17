@@ -82,14 +82,14 @@ static struct nl_sock *_iface_get_handle(void) {
  * Return an NETLINK_ROUTE cache.
  * https://bugzilla.redhat.com/show_bug.cgi?id=886862
  */
-static struct nl_cache *_iface_get_link_cache(struct nl_sock **handle) {
-    struct nl_cache **cache = NULL;
+static struct nl_cache * _iface_get_link_cache(struct nl_sock **handle) {
+    struct nl_cache *cache = NULL;
 
     if ((*handle = _iface_get_handle()) == NULL) {
         return NULL;
     }
 
-    if ((cache = rtnl_link_alloc_cache(*handle, AF_UNSPEC, cache)) == NULL) {
+    if (rtnl_link_alloc_cache(*handle, AF_UNSPEC, &cache)) {
         nl_close(*handle);
         nl_socket_free(*handle);
         return NULL;

@@ -33,10 +33,15 @@ import time
 import subprocess
 import tarfile
 import shutil
-from snack import *
+import locale
+import dialog
+import optparse
+import logging
 
 import gettext
 _ = lambda x: gettext.ldgettext("anaconda", x)
+
+__version__ = "0.0.1"
 
 global log
 
@@ -52,6 +57,8 @@ def setupPythonPath():
         sys.path.append('/usr/share/system-config-date')
 
 def setupEnvironment():
+    locale.setlocale(locale.LC_ALL, '')
+
     os.environ['HOME'] = '/tmp'
     os.environ['LC_NUMERIC'] = 'C'
 
@@ -66,13 +73,53 @@ def setupEnvironment():
     if os.environ.has_key("LD_PRELOAD"):
         del os.environ["LD_PRELOAD"]
 
+def parse_args():
+    usage = "usage: %prog [options]"
+    version = "Installer version: %s" % __version__
+
+    parser = optparse.OptionParser(usage=usage, version=version)
+    parser.add_option("-v", "--verbose",
+                      action="store_true",
+                      dest="verbose",
+                      help="Set verbosity output")
+
+    parser.add_option("-a", "--attach",
+                      action="store",
+                      dest="attach",
+                      default="127.0.0.1",
+                      help="URL for attaching the web server")
+
+    parser.add_option("-p", "--port",
+                      action="store",
+                      dest="port",
+                      default="8080",
+                      help="URL for attaching the web server")
+
+    parser.add_option("-o", "--output",
+                      action="store",
+                      dest="output",
+                      default="/tmp/output.dat",
+                      help="File for data output")
+
+    (options, args) = parser.parse_args()
+
+    if options.verbose:
+        print("Verbose output enabled")
+
+    print("Enabled API rest at .%s:%s." % (options.attach,
+                                           options.port))
+    print("Enabled output to file: .%s." % options.output)
+
+    return options
+
+
 def mkdir_p(path):
     try:
         os.makedirs(path)
     except OSError, exc:
         if exc.errno == errno.EEXIST:
             pass
-        else: 
+        else:
             raise
 
 def strip_markup(text):
@@ -160,7 +207,7 @@ def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
                 raise IOError, args
 
         stdout.write(s)
-        if progress: 
+        if progress:
             progress.pulse()
 
         if len(s) < 1:
@@ -266,20 +313,20 @@ class InstallProgressWindow:
     def set_label(self, txt):
         if not self.drawn:
             self.setupScreen()
-        
+
         self.info.setText(txt)
         self.processEvents()
 
     def set_text(self, txt):
         #if not self.drawn:
         #    self.setupScreen()
-        
+
         if len(txt) > self.width:
             txt = txt[:self.width]
         else:
             spaces = (self.width - len(txt)) / 2
             txt = (" " * spaces) + txt
-        
+
         self.label.setText(txt)
         self.processEvents()
 
@@ -327,7 +374,7 @@ class DiskSet:
             if device.startswith("md"):
                 log.info("ignoring sr device %s" %(device,))
                 continue
-	
+
             if device.startswith("sr"):
                 log.info("ignoring sr device %s" %(device,))
                 continue
@@ -384,14 +431,14 @@ class DiskSet:
             disk = parted_dev.disk_new_fresh(label)
             disk.commit()
             parted_disk = parted.PedDisk.new(parted_dev)
-            
+
         fstypeParted = parted.file_system_type_get('ext3')
         fsswapParted = parted.file_system_type_get('linux-swap')
 
         # partition new values startSec, endSec, I mean sectors.
         sizeMB = float(parted_dev.heads * parted_dev.cylinders * parted_dev.sectors) \
                 / (1024 * 1024) * parted_dev.sector_size
-        
+
         bootsize = self.megabytes_to_sectors(100)
         partitionBoot = \
             parted_disk.partition_new(parted.PARTITION_PRIMARY,
@@ -401,13 +448,13 @@ class DiskSet:
         swapsize = self.megabytes_to_sectors(500)
         partitionSwap = \
             parted_disk.partition_new(parted.PARTITION_PRIMARY,
-                                     fsswapParted, 
+                                     fsswapParted,
                                      bootsize+1,
                                      bootsize+swapsize)
         partitionRoot = \
             parted_disk.partition_new(parted.PARTITION_PRIMARY,
-                                     fstypeParted, 
-                                     bootsize+swapsize+1, 
+                                     fstypeParted,
+                                     bootsize+swapsize+1,
                                      parted_dev.length-1)
         parted_disk.dev.open()
         parted_disk.delete_all()
@@ -421,7 +468,7 @@ class DiskSet:
         partition = parted_disk.get_partition(BOOTPARTITION)
         partition.set_flag(parted.PARTITION_BOOT, 1)
         parted_disk.commit()
-            
+
         return 0
 
     def createPartitionsV2(self):
@@ -449,7 +496,7 @@ class DiskSet:
 	# Create geometry for 100MB from sector 1 - boot partition
 	bootsize = self.megabytes_to_sectors(100)
 
-	boot_partition_geom = parted.Geometry(device=target_device, start=1, end=bootsize) 
+	boot_partition_geom = parted.Geometry(device=target_device, start=1, end=bootsize)
 	filesystem_target = parted.FileSystem(type="ext3", geometry=boot_partition_geom)
 	boot_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
 		type=parted.PARTITION_NORMAL, geometry=boot_partition_geom)
@@ -480,9 +527,9 @@ class DiskSet:
         return 0
 
     def formatDisk(self, w, devicePath, formattool):
-        
-        rc = execWithPulseProgress(formattool[0], 
-                            [formattool[1], 
+
+        rc = execWithPulseProgress(formattool[0],
+                            [formattool[1],
                             devicePath],
                             stdout="/tmp/resize.out",
                             stderr="/tmp/resize.out",
@@ -525,7 +572,7 @@ class BspImage:
 
 class WelcomeWindow:
     def __call__(self, screen, anaconda):
-        rc = ButtonChoiceWindow(screen, _("%s") % (productName,), 
+        rc = ButtonChoiceWindow(screen, _("%s") % (productName,),
                                 _("Welcome to %s installer! "
                                 "\n\n"
                                 "This installation will delete all your disk data."
@@ -535,11 +582,11 @@ class WelcomeWindow:
                                 buttons = (_("OK"),), width = 50,
 				help = "welcome")
 
-        return 0 
+        return 0
 
 class CongratsWindow:
     def __call__(self, screen, anaconda):
-        rc = ButtonChoiceWindow(screen, _("%s") % (productName,), 
+        rc = ButtonChoiceWindow(screen, _("%s") % (productName,),
                                 _("Congratulations! "
                                 "\n\n"
                                 "Congratulations the installation is complete."
@@ -550,7 +597,7 @@ class CongratsWindow:
                                 buttons = (_("Reboot"),), width = 40,
 				help = "welcome")
 
-        return 0 
+        return 0
 
 class WaitWindow:
     def __init__(self, screen, title, text):
@@ -569,10 +616,11 @@ class WaitWindow:
         self.screen.popWindow()
         self.screen.refresh()
 
-class AmebaInstaller:
+class Installer:
     def __init__(self):
+        self._parse_args()
         self.targetdisk = None
-        self.screen = SnackScreen()
+        self.screen = dialog.Dialog(dialog="dialog")
         self.drawMainFrame()
         self.displayWellcome()
         self.prepareDisk()
@@ -581,25 +629,23 @@ class AmebaInstaller:
         self.finalSteps()
 
     def displayWellcome(self):
-        wellcome = WelcomeWindow() 
+        wellcome = WelcomeWindow()
         wellcome(self.screen, 0)
 
     def drawMainFrame(self):
-        productArch = "Comodoo Appliance System"
-        self.screen.drawRootText (0, 0, self.screen.width * " ")
-        self.screen.drawRootText (0, 0,
-            _("Welcome to %s for %s") % (productName, productArch,))
-        self.screen.pushHelpLine(
-            _("  <Tab>/<Alt-Tab> between elements   | <Space> selects   |  <F12> next screen"))
+        '''
+        Just the title of main window
+        '''
+        self.screen.set_background_title("Comodoo POS System")
 
     def prepareDisk(self):
-        w = WaitWindow(self.screen, "Wait please", 
+        w = WaitWindow(self.screen, "Wait please",
             "Detecting disks for installation")
         time.sleep(2)
         ds = DiskSet()
         self.targetdisk = ds.driveList()
         w.pop()
-        w = WaitWindow(self.screen, "Wait please", 
+        w = WaitWindow(self.screen, "Wait please",
             "The installer is preparing %s disk for installation" % self.targetdisk)
         time.sleep(2)
         w.pop()
@@ -618,7 +664,7 @@ class AmebaInstaller:
         w.pop()
 
         # Format
-        w = WaitWindow(self.screen, "Boot partition", 
+        w = WaitWindow(self.screen, "Boot partition",
             "Ready to format Boot partition")
         time.sleep(2)
         w.pop()
@@ -631,7 +677,7 @@ class AmebaInstaller:
         ds.formatDisk(w, self.targetdisk + "1", fstype2tool["ext3"])
         w.pop()
 
-        w = WaitWindow(self.screen, "Root partition", 
+        w = WaitWindow(self.screen, "Root partition",
             "Ready to format Root partition")
         time.sleep(2)
         w.pop()
@@ -644,7 +690,7 @@ class AmebaInstaller:
         ds.formatDisk(w, self.targetdisk + "3", fstype2tool["ext3"])
         w.pop()
 
-        w = WaitWindow(self.screen, "Swap partition", 
+        w = WaitWindow(self.screen, "Swap partition",
             "Enabling swap partition")
         time.sleep(2)
         w.pop()
@@ -657,11 +703,11 @@ class AmebaInstaller:
         ds.formatDisk(w, self.targetdisk + "2", fstype2tool["swap"])
         w.pop()
 
-      
+
         return 0
 
     def transferBSP(self):
-        w = WaitWindow(self.screen, "Preparing BSP installation", 
+        w = WaitWindow(self.screen, "Preparing BSP installation",
             "Loading Comodoo BSP, wait please ...")
 
         tb = BspImage(BSPFILE, INSTALLDEST, self.targetdisk)
@@ -678,7 +724,7 @@ class AmebaInstaller:
         tb.transferFiles(w)
         w.pop()
 
-        w = WaitWindow(self.screen, "Congratulation", 
+        w = WaitWindow(self.screen, "Congratulation",
             "BSP installed with success!")
         time.sleep(2)
         w.pop()
@@ -686,7 +732,7 @@ class AmebaInstaller:
         return 0
 
     def installGRUB(self):
-        w = WaitWindow(self.screen, "Wait please", 
+        w = WaitWindow(self.screen, "Wait please",
             "Installing GRUB boot loader ...")
         time.sleep(2)
         w.pop()
@@ -698,22 +744,22 @@ class AmebaInstaller:
 
         # FIXME: hard coded
         grubconf = GRUB % (self.targetdisk)
-        f = open(grub_file, 'w') 
+        f = open(grub_file, 'w')
         f.write(grubconf)
         f.close()
 
         # grub-install here.
         try:
-            process = subprocess.Popen('/usr/bin/grub-install', 
-                                stdout=subprocess.PIPE, 
+            process = subprocess.Popen('/usr/bin/grub-install',
+                                stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
                                 shell=True)
             process.wait()
         except:
             os.system("/bin/bash")
-        
+
     def finalSteps(self):
-        congrats = CongratsWindow() 
+        congrats = CongratsWindow()
         congrats(self.screen, 0)
 
 def main():
@@ -722,15 +768,17 @@ def main():
 
     log.info("Installer runnting, good luck!")
 
-    amebainstaller = AmebaInstaller()
+    installer = Installer()
 
     return 0
 
 if __name__ == "__main__":
     setupPythonPath()
+    options = parse_args()
 
-    # Custom imports here after custom path
-    import logging
+    sys.exit()
+
+    # Custom imports here after custom paths enabled
     import product
     import iutil
     import isys

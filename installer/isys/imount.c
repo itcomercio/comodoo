@@ -69,7 +69,7 @@ static int readFD(int fd, char **buf) {
 }
 
 int doPwMount(char *dev, char *where, char *fs, char *options, char **err) {
-    int rc, child, status, pipefd[2];
+    int child, status, pipefd[2];
     char *opts = NULL, *device;
 
     if (mkdirChain(where))
@@ -130,14 +130,14 @@ int doPwMount(char *dev, char *where, char *fs, char *options, char **err) {
         if (opts) {
             fprintf(stdout, "Running... /bin/mount -n -t %s -o %s %s %s\n",
                     fs, opts, device, where);
-            rc = execl("/bin/mount",
+                execl("/bin/mount",
                        "/bin/mount", "-n", "-t", fs, "-o", opts, device, where, NULL);
             exit(1);
         }
         else {
             fprintf(stdout, "Running... /bin/mount -n -t %s %s %s\n",
                     fs, device, where);
-            rc = execl("/bin/mount", "/bin/mount", "-n", "-t", fs, device, where, NULL);
+                execl("/bin/mount", "/bin/mount", "-n", "-t", fs, device, where, NULL);
             exit(1);
         }
     }
@@ -145,7 +145,7 @@ int doPwMount(char *dev, char *where, char *fs, char *options, char **err) {
     close(pipefd[1]);
 
     if (err != NULL)
-        rc = readFD(pipefd[0], err);
+        readFD(pipefd[0], err);
 
     close(pipefd[0]);
     waitpid(child, &status, 0);

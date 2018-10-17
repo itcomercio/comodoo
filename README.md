@@ -31,6 +31,10 @@ strace \
 tree \
 gdb \
 grub2-tools \
+parted-devel \
+parted-devel
+
+pip install pyparted
 
 #
 # Early phase-0

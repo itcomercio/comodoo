@@ -24,9 +24,12 @@ CFLAGS +=  -I$(PYTHONINCLUDE) -I..
 OBJECTS = devices.o imount.o smp.o cpio.o uncpio.o dasd.o \
           lang.o isofs.o linkdetect.o vio.o \
           ethtool.o eddsupport.o iface.o str.o auditd.o
+
 SOBJECTS = $(patsubst %.o,%.lo,$(OBJECTS))
 SOURCES = $(patsubst %.o,%.c,$(OBJECTS)) isys.c
+
 LOADLIBES = -lresolv -lpopt -lext2fs -lz -ldevmapper -lblkid -lX11
+
 LOADLIBES += $(SELINUXLIBES)
 ifeq ($(USESELINUX),1)
 LOADLIBES += -laudit
@@ -45,6 +48,8 @@ CFLAGS    += $(shell pkg-config --cflags NetworkManager)
 # libnl
 LOADLIBES += $(shell pkg-config --libs libnl-3.0)
 CFLAGS    += $(shell pkg-config --cflags libnl-3.0)
+LOADLIBES += $(shell pkg-config --libs libnl-route-3.0)
+CFLAGS    += $(shell pkg-config --cflags libnl-route-3.0)
 
 ifeq ($(ARCH),ppc)
 OBJECTS += minifind.o

@@ -23,3 +23,5 @@ a.out
 loader.po
 .vagrant
 installer/logs/*
+.idea/
+*.pyc
