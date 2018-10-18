@@ -1,23 +1,5 @@
 #!/bin/bash
-#
-# mk-bootdisk.sh
-#
-# Copyright (C) 2013  Comodoo.org All rights reserved.
-# Javi Roman <javiroman@comodoo.org>
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
+
 # FIXME: we have to use OE binaries, this script is for early 
 # development stages, and is fully dependent of Fedora 10 system.
 #
@@ -118,18 +100,18 @@ echo_note() {
 # set_value_distro
 #
 set_value_distro () {
-	case $DISTRO in
-	"Ubuntu") 
-		value="$1"
-		;;
-	"CentOS")
-		value="$2"
-		;;
-	*)
-		echo "No distro foundª"
-		exit 1
-		;;
-	esac
+    case $DISTRO in
+    "Ubuntu") 
+        value="$1"
+        ;;
+    "CentOS")
+        value="$2"
+        ;;
+    *)
+        echo "No distro foundª"
+        exit 1
+        ;;
+    esac
 }
 
 #
@@ -137,17 +119,17 @@ set_value_distro () {
 #
 extract_to_keepfile() {
 
-	set_value_distro "dpkg -L" "rpm -ql"
+    set_value_distro "dpkg -L" "rpm -ql"
 
-	$value $1 | grep -v -E "pyo|doc|man"  > /tmp/in-keep.tmp
-	for i in $(cat /tmp/in-keep.tmp);do
-		if [ -d $i ]; then
-			continue
-		else
-			echo $i
-		fi
-	done
-	rm -f /tmp/in-keep.tmp 2> /dev/null
+    $value $1 | grep -v -E "pyo|doc|man"  > /tmp/in-keep.tmp
+    for i in $(cat /tmp/in-keep.tmp);do
+        if [ -d $i ]; then
+            continue
+        else
+            echo $i
+        fi
+    done
+    rm -f /tmp/in-keep.tmp 2> /dev/null
 }
 
 #
@@ -287,9 +269,6 @@ makeproductfile() {
     fi
 }
 
-#
-# makemainimage:
-#
 makemainimage () {
     imagename=$1
     type=$2
@@ -302,12 +281,12 @@ makemainimage () {
     if [ $type = "ext2" ]; then
         SIZE=$(du -sk $IMGPATH | awk '{ print int($1 * 1.1) }')
         if [ -d $IMGPATH/usr/lib/anaconda-runtime ]; then
-	    ERROR=$(du -sk $IMGPATH/usr/lib/anaconda-runtime | awk '{ print $1 }')
-	    SIZE=$(expr $SIZE - $ERROR)
+        ERROR=$(du -sk $IMGPATH/usr/lib/anaconda-runtime | awk '{ print $1 }')
+        SIZE=$(expr $SIZE - $ERROR)
         fi
         if [ -d $IMGPATH/usr/lib/syslinux ]; then
-	    ERROR=$(du -sk $IMGPATH/usr/lib/syslinux | awk '{ print $1 }')
-	    SIZE=$(expr $SIZE - $ERROR)
+        ERROR=$(du -sk $IMGPATH/usr/lib/syslinux | awk '{ print $1 }')
+        SIZE=$(expr $SIZE - $ERROR)
         fi
         dd if=/dev/zero bs=1k count=${SIZE} of=$mmi_tmpimage 2>/dev/null
         mke2fs -q -F $mmi_tmpimage > /dev/null 
@@ -315,9 +294,9 @@ makemainimage () {
         mount -o loop $mmi_tmpimage $mmi_mntpoint
 
         (cd $IMGPATH; find . |
-	        fgrep -v "./usr/lib/anaconda-runtime" |
-	        fgrep -v "./usr/lib/syslinux"
-	        cpio -H crc -o) | (cd $mmi_mntpoint; cpio -iumd)
+            fgrep -v "./usr/lib/anaconda-runtime" |
+            fgrep -v "./usr/lib/syslinux"
+            cpio -H crc -o) | (cd $mmi_mntpoint; cpio -iumd)
         makeproductfile $mmi_mntpoint
         umount $mmi_mntpoint
         rmdir $mmi_mntpoint
@@ -360,11 +339,11 @@ instFile() {
     fi
 
     if [ -L $FILE ]; then
-	    cp -al $FILE $DESTROOT/`dirname $FILE`
-	    instFile `dirname $FILE`/`readlink $FILE` $DESTROOT
-	    return
+        cp -al $FILE $DESTROOT/`dirname $FILE`
+        instFile `dirname $FILE`/`readlink $FILE` $DESTROOT
+        return
     else
-	    cp -aL $FILE $DESTROOT/`dirname $FILE`
+        cp -aL $FILE $DESTROOT/`dirname $FILE`
     fi
 
     file $FILE | egrep -q ": (setuid )?ELF" &&  {
@@ -632,29 +611,29 @@ udevadm consoletype logger"
 
 for i in $INSTALL_BIN
 do
-	instbin / `which $i` $PKGDEST /bin/$i &>> ${TOP_DIR}/logs/second-stage
+    instbin / `which $i` $PKGDEST /bin/$i &>> ${TOP_DIR}/logs/second-stage
 done
 
 for i in $INSTALL_SBIN
 do
-	instbin / `which $i` $PKGDEST /sbin/$i &>> ${TOP_DIR}/logs/second-stage
+    instbin / `which $i` $PKGDEST /sbin/$i &>> ${TOP_DIR}/logs/second-stage
 done
 
 cat $KEEPFILE | while read spec ; do
     path=`echo "$spec" | sed 's,\([^[*\?]*\)/.*,\1,'`
     for filespec in `find $path -path "$spec" 2> /dev/null` ; do
-	    if [ ! -e $filespec ]; then
-	        continue
-	    elif [ ! -d $filespec ]; then
-	        instFile $filespec $PKGDEST &>> ${TOP_DIR}/logs/second-stage
-	    else
-	        for i in `find $filespec -type f 2> /dev/null` ; do 
-			instFile $i $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
-	        for i in `find $filespec -type l 2> /dev/null` ; do 
-			instFile $i $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
-	        for d in `find $filespec -type d 2> /dev/null` ; do 
-			instDir $d $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
-	    fi
+        if [ ! -e $filespec ]; then
+            continue
+        elif [ ! -d $filespec ]; then
+            instFile $filespec $PKGDEST &>> ${TOP_DIR}/logs/second-stage
+        else
+            for i in `find $filespec -type f 2> /dev/null` ; do 
+            instFile $i $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
+            for i in `find $filespec -type l 2> /dev/null` ; do 
+            instFile $i $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
+            for d in `find $filespec -type d 2> /dev/null` ; do 
+            instDir $d $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
+        fi
     done
 done
 
@@ -769,11 +748,8 @@ resdeps () {
     echo $items
 }
 
-#
-# upd_anaconda
-#
-upd_anaconda() {
-	DEST=$1
+populate_anaconda() {
+    DEST=$1
 
     [ ! -d $DEST ] && echo "$DEST doesn't exist! aborting." && exit 1
 
@@ -781,9 +757,6 @@ upd_anaconda() {
     pushd stage-2
     cp -av usr $DEST 
     popd
-
-    echo "deleting .svn files"
-    find $DEST -name .svn | xargs rm -fr
 
     echo "magic *.pyc -> /dev/null:"
     find $DEST/usr/lib/anaconda -name "*.py" | while read fn; do
@@ -800,12 +773,13 @@ upd_anaconda() {
 ####################################################
 #                     Main 
 ####################################################
-[ ! -z $1 ] && upd_anaconda $1
+[ ! -z $1 ] && populate_anaconda $1
 
 #
 # Zero stage population (stage-0): syslinux phase
 #
 echo_note "WARNING" "Old temporary files housekepping ..."
+
 rm -fr $TMPDIR/comodoo-* 2> /dev/null
 rm -fr $TMPDIR/dir 2> /dev/null
 rm -rf $MKB_DIR  2> /dev/null
@@ -871,36 +845,36 @@ echo_note "WARNING" "isys building ...."
 echo "############### isys #########" >> ${TOP_DIR}/logs/build
 make -C isys &>> ${TOP_DIR}/logs/build
 if [ $? = 0 ];then
-	echo_note "OK" "[OK]"
+    echo_note "OK" "[OK]"
 else
-	echo_note "ERROR" "[ERROR]"
+    echo_note "ERROR" "[ERROR]"
 fi
 
 echo_note "WARNING" "isomd5sum building ...."
 echo "############### isomd5sum #########" >> ${TOP_DIR}/logs/build
 make -C isomd5sum &>> ${TOP_DIR}/logs/build
 if [ $? = 0 ];then
-	echo_note "OK" "[OK]"
+    echo_note "OK" "[OK]"
 else
-	echo_note "ERROR" "[ERROR]"
+    echo_note "ERROR" "[ERROR]"
 fi
 
 echo_note "WARNING" "stage-1 building...."
 echo "############### stage-1 #########" >> ${TOP_DIR}/logs/build
 make -C stage-1 &>> ${TOP_DIR}/logs/build
 if [ $? = 0 ];then
-	echo_note "OK" "[OK]"
+    echo_note "OK" "[OK]"
 else
-	echo_note "ERROR" "[ERROR]"
+    echo_note "ERROR" "[ERROR]"
 fi
 
 echo_note "WARNING" "pyblock building...."
 echo "############### stage-1 #########" >> ${TOP_DIR}/logs/build
 make -C pyblock &>> ${TOP_DIR}/logs/build
 if [ $? = 0 ];then
-	echo_note "OK" "[OK]"
+    echo_note "OK" "[OK]"
 else
-	echo_note "ERROR" "[ERROR]"
+    echo_note "ERROR" "[ERROR]"
 fi
 
 echo_note "WARNING" "Install init in $MKB_DIR/sbin/init"
@@ -939,12 +913,12 @@ udevadm consoletype logger"
 echo_note "WARNING" "$MKB_DIR population ..."
 for i in $INSTALL_BIN
 do
-	instbin / `which $i` $MKB_DIR /bin/$i &>> ${TOP_DIR}/logs/initrd-population
+    instbin / `which $i` $MKB_DIR /bin/$i &>> ${TOP_DIR}/logs/initrd-population
 done
 
 for i in $INSTALL_SBIN
 do
-	instbin / `which $i` $MKB_DIR /sbin/$i &>> ${TOP_DIR}/logs/initrd-population
+    instbin / `which $i` $MKB_DIR /sbin/$i &>> ${TOP_DIR}/logs/initrd-population
 done
 
 instbin / `which python` $MKB_DIR /usr/bin/python &>> ${TOP_DIR}/logs/initrd-population
@@ -962,18 +936,18 @@ extract_to_keepfile libc6 >> $KEEPFILERD
 cat $KEEPFILERD | while read spec ; do
     path=`echo "$spec" | sed 's,\([^[*\?]*\)/.*,\1,'`
     for filespec in `find $path -path "$spec" 2> /dev/null` ; do
-	    if [ ! -e $filespec ]; then
-	        continue
-	    elif [ ! -d $filespec ]; then
-	        instFile $filespec $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population 
-	    else
-	        for i in `find $filespec -type f 2> /dev/null`; do 
-			instFile $i $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
-	        for i in `find $filespec -type l 2> /dev/null`; do 
-			instFile $i $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
-	        for d in `find $filespec -type d 2> /dev/null`; do 
-			instDir $d $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
-	    fi
+        if [ ! -e $filespec ]; then
+            continue
+        elif [ ! -d $filespec ]; then
+            instFile $filespec $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population 
+        else
+            for i in `find $filespec -type f 2> /dev/null`; do 
+            instFile $i $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
+            for i in `find $filespec -type l 2> /dev/null`; do 
+            instFile $i $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
+            for d in `find $filespec -type d 2> /dev/null`; do 
+            instDir $d $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
+        fi
     done
 done
 
@@ -1027,8 +1001,8 @@ echo_note "OK" "[OK]"
 echo_note "WARNING" "kernel modules population for initrd image ..."
 
 if [ -z ${ROOTFS} ]; then
-	echo_note "ERROR" "ERROR: BSP image is no available. Abort!"
-	exit 1
+    echo_note "ERROR" "ERROR: BSP image is no available. Abort!"
+    exit 1
 fi
 
 mkdir yocto/tmp
@@ -1198,8 +1172,8 @@ echo_note "WARNING" "Wrote $MKB_FSIMAGE (${size}k compressed)"
 
 gzip -t $MKB_FSIMAGE
 if [ $? = 1 ]; then 
-	echo_note "ERROR" "ERROR CRC initrd" 
-	exit 1
+    echo_note "ERROR" "ERROR CRC initrd" 
+    exit 1
 fi
 echo_note "OK" "[OK]"
 
