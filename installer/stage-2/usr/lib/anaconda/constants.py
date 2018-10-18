@@ -17,6 +17,25 @@
 
 import product
 
+MSG_ROOT = "Comodoo Point of Sale Installer"
+MSG_WELCOME = "Comodoo POS installer, please press the OK button " \
+              "for continuing the installation process"
+MSG_DISK_SET = "Wait please The installer is preparing %s disk " \
+               "for installation"
+MSG_PARTITION = "Partitioning in progress ..."
+MSG_PART_DONE = "The disk was sucessfully formated"
+MSG_BOOTPART_READY = "Boot partition. Ready to format the Boot partition"
+MSG_FORMAT_BOOT = "Making ext3 filesystem in boot partition ..."
+MSG_FORMAT_OK = "The disk was sucessfully formated"
+MSG_FORMAT_ROOT = "Making ext3 filesystem in root partition ..."
+MSG_FORMAT_SWAP = "Making swap filesystem ..."
+MSG_LOADING_BSP = "Loading Comodoo BSP, wait please ..."
+MSG_BSP_OK = "BSP transfered sucessfully"
+MSG_GRUB = "Wait please, Installing GRUB boot loader ..."
+MSG_REBOOT = "Congratulations the installation is complete \n\n" \
+             "Remove any installation media usaded during installation."
+
+
 MIN_RAM = 64000
 
 productName = product.productName

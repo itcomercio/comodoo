@@ -1,4 +1,6 @@
 #!/usr/bin/env python2
+# vim: ts=4:sw=4:et:sts=4:ai:tw=80
+import errno
 import sys
 import os
 import time
@@ -10,26 +12,34 @@ import dialog
 import optparse
 import logging
 
-import gettext
-_ = lambda x: gettext.ldgettext("anaconda", x)
+from constants import *
 
 __version__ = "0.0.1"
 
-global log
-global options
+# import gettext
+# _ = lambda x: gettext.ldgettext("anaconda", x)
 
-fstype2tool = {"ext3":("mkfs.ext3", "-v"), "swap":("mkswap", "-V1")}
+# FIXME: move to constasts
 
-def setupPythonPath():
-    '''Set real path or development paths for run in svn'''
 
-    if (os.path.exists('../stage-2')):
+log = None
+
+fstype2tool = {"ext3": ("mkfs.ext3", "-v"), "swap": ("mkswap", "-V1")}
+
+
+def setup_python_path():
+    """
+    Set real path or development paths for run in svn
+    """
+
+    if os.path.exists('../stage-2'):
         sys.path.insert(0, 'usr/lib/anaconda')
     else:
         sys.path.insert(0, '/usr/lib/anaconda')
         sys.path.append('/usr/share/system-config-date')
 
-def setupEnvironment():
+
+def setup_environment():
     locale.setlocale(locale.LC_ALL, '')
 
     os.environ['HOME'] = '/tmp'
@@ -43,10 +53,11 @@ def setupEnvironment():
 
     # we can't let the LD_PRELOAD hang around because it will leak into
     # rpm %post and the like.  ick :/
-    if os.environ.has_key("LD_PRELOAD"):
+    if "LD_PRELOAD" in os.environ:
         del os.environ["LD_PRELOAD"]
 
-def parseArgs():
+
+def parse_args():
     usage = "usage: %prog [options]"
     version = "Installer version: %s" % __version__
 
@@ -75,23 +86,25 @@ def mkdir_p(path):
         else:
             raise
 
+
 def strip_markup(text):
     if text.find("<") == -1:
         return text
     r = ""
-    inTag = False
+    in_tag = False
     for c in text:
-        if c == ">" and inTag:
-            inTag = False
+        if c == ">" and in_tag:
+            in_tag = False
             continue
-        elif c == "<" and not inTag:
-            inTag = True
+        elif c == "<" and not in_tag:
+            in_tag = True
             continue
-        elif not inTag:
+        elif not in_tag:
             r += c
     return r.encode("utf-8")
 
-def setupLoggingFromOpts(opts):
+
+def setup_logging_from_opts(opts):
     if opts.loglevel and logLevelMap.has_key(opts.loglevel):
         log.setHandlersLevel(logLevelMap[opts.loglevel])
 
@@ -102,25 +115,9 @@ def setupLoggingFromOpts(opts):
         else:
             logger.addSysLogHandler(log, opts.syslog)
 
-def enoughMemory():
-    '''Minimal RAM for text mode installation, the only mode for us'''
-    if not options.devel:
-        if iutil.memInstalled() < MIN_RAM:
-            screen = SnackScreen()
-            ButtonChoiceWindow(screen, _('Fatal Error'),
-                                _('You do not have enough RAM to install %s '
-                                  'on this machine.\n'
-                                  '\n'
-                                  'Press <return> to reboot your system.\n')
-                               %(product.productName,),
-                               buttons = (_("OK"),))
-            screen.finish()
-            return 0
 
-    return 1
-
-def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
-                          progress = None, root = '/'):
+def exec_with_pulse_progress(command, argv, stdin=0, stdout=1, stderr=2,
+                             progress=None):
     argv = list(argv)
     if type(stdin) == type("string"):
         if os.access(stdin, os.R_OK):
@@ -133,7 +130,7 @@ def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
     if type(stderr) == type("string"):
         stderr = open(stderr, "w")
     if stdout is not None and type(stdout) != int:
-        stdout.write("Running... %s\n" %([command] + argv,))
+        stdout.write("Running... %s\n" % ([command] + argv,))
 
     p = os.pipe()
     childpid = os.fork()
@@ -169,7 +166,7 @@ def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
     try:
         (pid, status) = os.waitpid(childpid, 0)
     except OSError, (num, msg):
-        log.critical("exception from waitpid: %s %s" %(num, msg))
+        log.critical("exception from waitpid: %s %s" % (num, msg))
 
     progress and progress.pop()
 
@@ -182,162 +179,41 @@ def execWithPulseProgress(command, argv, stdin = 0, stdout = 1, stderr = 2,
 
     return 1
 
-class ProgressWindow:
-    def __init__(self, screen, title, text, total, updpct = 0.05, pulse = False):
-        self.count = 0
-        self.multiplier = 1
-        self.screen = screen
-        width = 55
-        self.total = total
-
-        if self.total == 1.0:
-            self.multiplier = 100
-
-        if (len(text) > width):
-            width = len(text)
-
-        t = TextboxReflowed(width, text)
-
-        g = GridForm(self.screen, title, 1, 2)
-        g.add(t, 0, 0, (0, 0, 0, 1), anchorLeft=1)
-
-        # bar -> scale(width, full_value)
-        self.scale = Scale(int(width), int(float(self.total) * self.multiplier))
-        if not pulse:
-            g.add(self.scale, 0, 1)
-
-        g.draw()
-        self.screen.refresh()
-
-    def pop(self):
-        self.screen.popWindow()
-        self.screen.refresh()
-        del self.scale
-        self.scale = None
-
-    def pulse(self):
-        if self.count == self.total:
-            self.count = 0
-
-        self.count = self.count + 1
-        self.set(self.count)
-
-    def set(self, amount):
-        self.scale.set(int(float(amount) * self.multiplier))
-        self.screen.refresh()
-
-    def refresh(self):
-        pass
-
-class InstallProgressWindow:
-    def __init__(self, screen, title, text, total, pulse = False):
-        self.count = 0
-        self.multiplier = 1
-        self.screen = screen
-        width = 55
-        self.total = total
-
-        if self.total == 1.0:
-            self.multiplier = 100
-
-        if (len(text) > width):
-            width = len(text)
-
-        self.grid = GridForm(self.screen, title, 1, 6)
-
-        self.width = 65
-        self.scale = Scale(int(width), int(float(self.total) * self.multiplier))
-        self.grid.add (self.scale, 0, 1, (0, 1, 0, 0))
-
-        self.label = Label("")
-        self.grid.add(self.label, 0, 2, (0, 1, 0, 0), anchorLeft = 1)
-
-        self.info = Textbox(self.width, 4, "", wrap = 1)
-        self.grid.add(self.info, 0, 3, (0, 1, 0, 0))
-
-        self.grid.draw()
-        self.screen.refresh()
-        self.drawn = True
-
-    def processEvents(self):
-        self.grid.draw()
-        self.screen.refresh()
-
-    def set_label(self, txt):
-        if not self.drawn:
-            self.setupScreen()
-
-        self.info.setText(txt)
-        self.processEvents()
-
-    def set_text(self, txt):
-        #if not self.drawn:
-        #    self.setupScreen()
-
-        if len(txt) > self.width:
-            txt = txt[:self.width]
-        else:
-            spaces = (self.width - len(txt)) / 2
-            txt = (" " * spaces) + txt
-
-        self.label.setText(txt)
-        self.processEvents()
-
-    def pop(self):
-        self.screen.popWindow()
-        self.screen.refresh()
-        del self.scale
-        self.scale = None
-
-    def pulse(self):
-        if self.count == self.total:
-            self.count = 0
-
-        self.count = self.count + 1
-        self.set(self.count)
-
-    def set(self, amount):
-        self.scale.set(int(float(amount) * self.multiplier))
-        self.screen.refresh()
-
-    def refresh(self):
-        pass
-
 
 class DiskSet:
     """The disks in the system."""
 
-    def __init__ (self):
+    def __init__(self):
         self.deviceFile = None
 
-    def driveList(self):
+    def drive_list(self):
         for dev in minihal.get_devices_by_type("storage"):
             if dev['device'] is None:
                 continue
 
-            device = dev['device'].replace('/dev/','')
+            device = dev['device'].replace('/dev/', '')
 
-            log.info("detected possible disk: %s" %(device,))
-            log.info("device type: %s" %(dev['storage.drive_type'],))
+            log.info("detected possible disk: %s" % (device,))
+            log.info("device type: %s" % (dev['storage.drive_type'],))
 
             if device.startswith("sg"):
-                log.info("ignoring st device %s" %(device,))
+                log.info("ignoring st device %s" % (device,))
                 continue
 
             if device.startswith("md"):
-                log.info("ignoring sr device %s" %(device,))
+                log.info("ignoring sr device %s" % (device,))
                 continue
 
             if device.startswith("sr"):
-                log.info("ignoring sr device %s" %(device,))
+                log.info("ignoring sr device %s" % (device,))
                 continue
 
             if dev['storage.drive_type'] == 'disk':
                 self.deviceFile = dev['device']
-                log.info("final disk selected: %s" %(self.deviceFile,))
+                log.info("final disk selected: %s" % (self.deviceFile,))
 
-	if not self.deviceFile:
-                log.warning("no detected possible disks: %s" %(device,))
+        if not self.deviceFile:
+            log.warning("no detected possible disks: %s" % (device,))
 
         return self.deviceFile
 
@@ -345,7 +221,7 @@ class DiskSet:
         return long(mb * MEGABYTE / sector_bytes)
 
     def sectors_to_megabytes(self, sectors, sector_bytes=512):
-        return float((float(sectors) * sector_bytes)/ float(MEGABYTE))
+        return float((float(sectors) * sector_bytes) / float(MEGABYTE))
 
     def convert_bytes(self, bytes):
         bytes = float(bytes)
@@ -365,7 +241,7 @@ class DiskSet:
             size = '%.2fb' % bytes
         return size
 
-    def createPartitionsV1(self):
+    def create_partitions_v1(self):
         '''Up to now, the partition layout is fixed to conservative
         values. The current layout is:
         /dev/sda1    boot partition -> 100MB
@@ -389,26 +265,27 @@ class DiskSet:
         fsswapParted = parted.file_system_type_get('linux-swap')
 
         # partition new values startSec, endSec, I mean sectors.
-        sizeMB = float(parted_dev.heads * parted_dev.cylinders * parted_dev.sectors) \
-                / (1024 * 1024) * parted_dev.sector_size
+        sizeMB = float(
+            parted_dev.heads * parted_dev.cylinders * parted_dev.sectors) \
+                 / (1024 * 1024) * parted_dev.sector_size
 
         bootsize = self.megabytes_to_sectors(100)
         partitionBoot = \
             parted_disk.partition_new(parted.PARTITION_PRIMARY,
-                                     fstypeParted,
-                                     1,
-                                     bootsize)
+                                      fstypeParted,
+                                      1,
+                                      bootsize)
         swapsize = self.megabytes_to_sectors(500)
         partitionSwap = \
             parted_disk.partition_new(parted.PARTITION_PRIMARY,
-                                     fsswapParted,
-                                     bootsize+1,
-                                     bootsize+swapsize)
+                                      fsswapParted,
+                                      bootsize + 1,
+                                      bootsize + swapsize)
         partitionRoot = \
             parted_disk.partition_new(parted.PARTITION_PRIMARY,
-                                     fstypeParted,
-                                     bootsize+swapsize+1,
-                                     parted_dev.length-1)
+                                      fstypeParted,
+                                      bootsize + swapsize + 1,
+                                      parted_dev.length - 1)
         parted_disk.dev.open()
         parted_disk.delete_all()
         entireDisk = parted.PedDevice.get(self.deviceFile).constraint_any()
@@ -424,69 +301,88 @@ class DiskSet:
 
         return 0
 
-    def createPartitionsV2(self):
+    def create_partitions_v2(self):
         '''Up to now, the partition layout is fixed to conservative
         values. The current layout is:
         /dev/sda1    boot partition -> 100MB
         /dev/sda2    swap partition -> 1.5 size of RAM
         /dev/sda3    root partition -> remaining disk space
         '''
-	target_device = parted.Device(path=self.deviceFile)
+        target_device = parted.Device(path=self.deviceFile)
 
-	# log diskinformation for debug
-	(cylinders, heads, sectors) = target_device.biosGeometry
-	sizeInBytes = target_device.length * target_device.sectorSize
-	geometry_cad = "%d heads, %d sectors/track, %d cylinders\n" % (heads, sectors, cylinders,)
-	size_cad = "Disk /dev/sdb size: %s\n" % (self.convert_bytes(sizeInBytes),)
-    	log.info(geometry_cad)
-    	log.info(size_cad)
+        # log diskinformation for debug
+        (cylinders, heads, sectors) = target_device.biosGeometry
+        sizeInBytes = target_device.length * target_device.sectorSize
+        geometry_cad = "%d heads, %d sectors/track, %d cylinders\n" % (
+        heads, sectors, cylinders,)
+        size_cad = "Disk /dev/sdb size: %s\n" % (
+        self.convert_bytes(sizeInBytes),)
+        log.info(geometry_cad)
+        log.info(size_cad)
 
-	# Create Disk object
-	target_disk = parted.freshDisk(target_device, "msdos")
+        # Create Disk object
+        target_disk = parted.freshDisk(target_device, "msdos")
 
-	target_constraint = parted.Constraint(device = target_device)
+        target_constraint = parted.Constraint(device=target_device)
 
-	# Create geometry for 100MB from sector 1 - boot partition
-	bootsize = self.megabytes_to_sectors(100)
+        # Create geometry for 100MB from sector 1 - boot partition
+        bootsize = self.megabytes_to_sectors(100)
 
-	boot_partition_geom = parted.Geometry(device=target_device, start=1, end=bootsize)
-	filesystem_target = parted.FileSystem(type="ext3", geometry=boot_partition_geom)
-	boot_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
-		type=parted.PARTITION_NORMAL, geometry=boot_partition_geom)
+        boot_partition_geom = parted.Geometry(device=target_device, start=1,
+                                              end=bootsize)
+        filesystem_target = parted.FileSystem(type="ext3",
+                                              geometry=boot_partition_geom)
+        boot_partition = parted.Partition(disk=target_disk,
+                                          fs=filesystem_target,
+                                          type=parted.PARTITION_NORMAL,
+                                          geometry=boot_partition_geom)
 
-	# Create geometry for 500MB of swap partition
-	swapsize = self.megabytes_to_sectors(500)
+        # Create geometry for 500MB of swap partition
+        swapsize = self.megabytes_to_sectors(500)
 
-	swap_partition_geom = parted.Geometry(device=target_device, start=bootsize+1, end=bootsize+swapsize)
-	filesystem_target = parted.FileSystem(type="linux-swap(v1)", geometry=swap_partition_geom)
-	swap_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
-		type=parted.PARTITION_NORMAL, geometry=swap_partition_geom)
+        swap_partition_geom = parted.Geometry(device=target_device,
+                                              start=bootsize + 1,
+                                              end=bootsize + swapsize)
+        filesystem_target = parted.FileSystem(type="linux-swap(v1)",
+                                              geometry=swap_partition_geom)
+        swap_partition = parted.Partition(disk=target_disk,
+                                          fs=filesystem_target,
+                                          type=parted.PARTITION_NORMAL,
+                                          geometry=swap_partition_geom)
 
-	root_partition_geom = parted.Geometry(device=target_device, start=bootsize+swapsize+1, end=target_device.length-1)
-	filesystem_target = parted.FileSystem(type="ext3", geometry=root_partition_geom)
-	root_partition = parted.Partition(disk=target_disk, fs=filesystem_target,
-		type=parted.PARTITION_NORMAL, geometry=root_partition_geom)
+        root_partition_geom = parted.Geometry(device=target_device,
+                                              start=bootsize + swapsize + 1,
+                                              end=target_device.length - 1)
+        filesystem_target = parted.FileSystem(type="ext3",
+                                              geometry=root_partition_geom)
+        root_partition = parted.Partition(disk=target_disk,
+                                          fs=filesystem_target,
+                                          type=parted.PARTITION_NORMAL,
+                                          geometry=root_partition_geom)
 
-
-	# Delete all partitions in the drive
-	target_disk.deleteAllPartitions()
-	# Add new partitions
-	target_disk.addPartition(partition = boot_partition, constraint=target_constraint)
-	target_disk.addPartition(partition = swap_partition, constraint=target_constraint)
-	target_disk.addPartition(partition = root_partition, constraint=target_constraint)
-	# All the stuff we just did needs to be committed to the disk.
-	target_disk.commit()
+        # Delete all partitions in the drive
+        target_disk.deleteAllPartitions()
+        # Add new partitions
+        target_disk.addPartition(partition=boot_partition,
+                                 constraint=target_constraint)
+        target_disk.addPartition(partition=swap_partition,
+                                 constraint=target_constraint)
+        target_disk.addPartition(partition=root_partition,
+                                 constraint=target_constraint)
+        # All the stuff we just did needs to be committed to the disk.
+        target_disk.commit()
 
         return 0
 
-    def formatDisk(self, w, devicePath, formattool):
+    def format_disk(self, w, devicePath, formattool):
 
-        rc = execWithPulseProgress(formattool[0],
-                            [formattool[1],
-                            devicePath],
-                            stdout="/tmp/resize.out",
-                            stderr="/tmp/resize.out",
-                            progress = w);
+        rc = exec_with_pulse_progress(formattool[0],
+                                      [formattool[1],
+                                       devicePath],
+                                      stdout="/tmp/resize.out",
+                                      stderr="/tmp/resize.out",
+                                      progress=w);
+
 
 class BspImage:
     def __init__(self, filename, destdir, disk):
@@ -497,19 +393,19 @@ class BspImage:
         self.tar = None
         self.disk = disk
 
-    def loadBsp(self):
+    def load_bsp(self):
         self.tar = tarfile.open(self.bspfile, "r:gz")
         self.list_of_names = self.tar.getnames()
 
         self.total = len(self.list_of_names)
 
-    def transferFiles(self, w):
+    def transfer_files(self, w):
         os.mkdir(INSTALLDEST)
         # FIXME: hard coded
         isys.mount(self.disk + "3", INSTALLDEST, fstype="ext3")
         os.mkdir(INSTALLDEST + "/boot")
         # FIXME: hard coded
-        isys.mount(self.disk + "1", INSTALLDEST +"/boot", fstype="ext3")
+        isys.mount(self.disk + "1", INSTALLDEST + "/boot", fstype="ext3")
 
         for filename in self.list_of_names:
             try:
@@ -519,58 +415,13 @@ class BspImage:
             except KeyError:
                 print 'ERROR: Did not find %s in tar archive' % filename
 
-    def getTotalFiles(self):
+    def get_total_files(self):
         return self.total
 
 
-class WelcomeWindow:
-    def __call__(self, screen, anaconda):
-        rc = ButtonChoiceWindow(screen, _("%s") % (productName,),
-                                _("Welcome to %s installer! "
-                                "\n\n"
-                                "This installation will delete all your disk data."
-                                "All disk partitions will be erased and formated."
-                                "\n\n")
-                                % ("COMODOO Appliance System", ),
-                                buttons = (_("OK"),), width = 50,
-				help = "welcome")
-
-        return 0
-
-class CongratsWindow:
-    def __call__(self, screen, anaconda):
-        rc = ButtonChoiceWindow(screen, _("%s") % (productName,),
-                                _("Congratulations! "
-                                "\n\n"
-                                "Congratulations the installation is complete."
-                                "\n\n"
-                                "Remove any installation media usaded during"
-                                "\n"
-                                "the installation process and press Reboot button."),
-                                buttons = (_("Reboot"),), width = 40,
-				help = "welcome")
-
-        return 0
-
-class WaitWindow:
-    def __init__(self, screen, title, text):
-        self.screen = screen
-        width = 100
-        if (len(text) < width): width = len(text)
-
-        t = TextboxReflowed(width, text)
-
-        g = GridForm(self.screen, title, 1, 1)
-        g.add(t, 0, 0)
-        g.draw()
-        self.screen.refresh()
-
-    def pop(self):
-        self.screen.popWindow()
-        self.screen.refresh()
-
 class Installer:
-    def __init__(self):
+    def __init__(self, opt):
+        self.options = opt
         self.targetdisk = None
         self.screen = dialog.Dialog(dialog="dialog")
         self.drawMainFrame()
@@ -581,152 +432,146 @@ class Installer:
         self.finalSteps()
 
     def displayWellcome(self):
-        wellcome = WelcomeWindow()
-        wellcome(self.screen, 0)
+        self.screen.msgbox(MSG_WELCOME, None, None)
 
     def drawMainFrame(self):
         '''
         Just the title of main window
         '''
-        self.screen.set_background_title("Comodoo POS System")
+        self.screen.set_background_title(MSG_ROOT)
 
     def prepareDisk(self):
-        w = WaitWindow(self.screen, "Wait please",
-            "Detecting disks for installation")
-        time.sleep(2)
-        ds = DiskSet()
-        self.targetdisk = ds.driveList()
-        w.pop()
-        w = WaitWindow(self.screen, "Wait please",
-            "The installer is preparing %s disk for installation" % self.targetdisk)
-        time.sleep(2)
-        w.pop()
+        #
+        # Main Device disk detection
+        #
+        if self.options.devel:
+            self.targetdisk = "/dev/sda"
+        else:
+            ds = DiskSet()
+            self.targetdisk = ds.drive_list()
 
-        # Partitioning
-        ds.createPartitionsV2()
-        title = "Master Boot Record creation"
-        text = "Partitioning in progress ..."
-        total = 2
-        w = ProgressWindow(self.screen, title, text, total)
+        self.screen.pause(MSG_DISK_SET % self.targetdisk, None, None, 2)
+        #
+        # Main device disk partitioning
+        #
+        if not self.options.devel:
+            ds.create_partitions_v2()
 
-        for i in range(1, total+1):
-            w.pulse()
-            time.sleep(1)
-
-        w.pop()
+        self.screen.gauge_start(MSG_PARTITION, None, None, 1)
+        self.screen.gauge_update(10)
+        time.sleep(3)
+        self.screen.gauge_update(50)
+        time.sleep(3)
+        self.screen.gauge_update(100, MSG_PART_DONE)
+        self.screen.gauge_stop()
 
         # Format
-        w = WaitWindow(self.screen, "Boot partition",
-            "Ready to format Boot partition")
+        self.screen.pause(MSG_BOOTPART_READY, None, None, 2)
+        self.screen.gauge_start(MSG_FORMAT_BOOT, None, None, 1)
+        self.screen.gauge_update(10)
+
+        if not self.options.devel:
+            ds.format_disk(w, self.targetdisk + "1", fstype2tool["ext3"])
+        else:
+            time.sleep(3)
+
+        self.screen.gauge_update(50)
+        time.sleep(3)
+        self.screen.gauge_update(100, MSG_FORMAT_OK)
         time.sleep(2)
-        w.pop()
+        self.screen.gauge_stop()
 
-        title = "Boot partition"
-        text = "Making ext3 filesystem in boot partition ..."
-        total = 500
-        w = ProgressWindow(self.screen, title, text, total)
-        # FIXME: hard coded
-        ds.formatDisk(w, self.targetdisk + "1", fstype2tool["ext3"])
-        w.pop()
+        self.screen.gauge_start(MSG_FORMAT_ROOT, None, None, 1)
+        self.screen.gauge_update(10)
 
-        w = WaitWindow(self.screen, "Root partition",
-            "Ready to format Root partition")
+        if not self.options.devel:
+            ds.format_disk(w, self.targetdisk + "3", fstype2tool["ext3"])
+        else:
+            time.sleep(3)
+
+        self.screen.gauge_update(50)
+        time.sleep(3)
+        self.screen.gauge_update(100, MSG_FORMAT_OK)
         time.sleep(2)
-        w.pop()
+        self.screen.gauge_stop()
 
-        title = "Root partition"
-        text = "Making ext3 filesystem in root partition ..."
-        total = 2000
-        w = ProgressWindow(self.screen, title, text, total)
-        # FIXME: hard coded
-        ds.formatDisk(w, self.targetdisk + "3", fstype2tool["ext3"])
-        w.pop()
+        self.screen.gauge_start(MSG_FORMAT_SWAP, None, None, 1)
+        self.screen.gauge_update(10)
+        if not self.options.devel:
+            ds.format_disk(w, self.targetdisk + "2", fstype2tool["swap"])
+        else:
+            time.sleep(3)
 
-        w = WaitWindow(self.screen, "Swap partition",
-            "Enabling swap partition")
+        self.screen.gauge_update(50)
+        time.sleep(3)
+        self.screen.gauge_update(100, MSG_FORMAT_OK)
         time.sleep(2)
-        w.pop()
-
-        title = "Swap space"
-        text = "Making swap filesystem ..."
-        total = 2000
-        w = ProgressWindow(self.screen, title, text, total)
-        # FIXME: hard coded
-        ds.formatDisk(w, self.targetdisk + "2", fstype2tool["swap"])
-        w.pop()
-
+        self.screen.gauge_stop()
 
         return 0
 
     def transferBSP(self):
-        w = WaitWindow(self.screen, "Preparing BSP installation",
-            "Loading Comodoo BSP, wait please ...")
+        self.screen.gauge_start(MSG_LOADING_BSP, None, None, 1)
+        self.screen.gauge_update(10)
 
-        tb = BspImage(BSPFILE, INSTALLDEST, self.targetdisk)
-        tb.loadBsp()
-        total = tb.getTotalFiles()
-        time.sleep(1)
-        w.pop()
+        if not self.options.devel:
+            tb = BspImage(BSPFILE, INSTALLDEST, self.targetdisk)
+            tb.load_bsp()
+            total = tb.get_total_files()
 
-        title = "BSP installation"
-        text = "Installation in progress ..."
-        w = InstallProgressWindow(self.screen, title, text, total)
-        w.set_text("boot population")
+        self.screen.gauge_update(10)
 
-        tb.transferFiles(w)
-        w.pop()
+        if not self.options.devel:
+            tb.transfer_files(w)
 
-        w = WaitWindow(self.screen, "Congratulation",
-            "BSP installed with success!")
+        self.screen.gauge_update(10)
         time.sleep(2)
-        w.pop()
+        self.screen.gauge_update(100, MSG_BSP_OK)
+        time.sleep(2)
+        self.screen.gauge_stop()
 
         return 0
 
     def installGRUB(self):
-        w = WaitWindow(self.screen, "Wait please",
-            "Installing GRUB boot loader ...")
+        self.screen.gauge_start(MSG_GRUB, None, None, 1)
         time.sleep(2)
-        w.pop()
+        self.screen.gauge_update(10)
 
-        mkdir_p(INSTALLDEST + "/boot/grub/")
-        grub_file = INSTALLDEST + "/boot/grub/menu.lst"
-        shutil.copy("/usr/share/grub/stage1", "/mnt/disk/boot/grub/stage1")
-        shutil.copy("/usr/share/grub/stage2", "/mnt/disk/boot/grub/stage2")
+        if not self.options.devel:
+            mkdir_p(INSTALLDEST + "/boot/grub/")
+            grub_file = INSTALLDEST + "/boot/grub/menu.lst"
+            shutil.copy("/usr/share/grub/stage1", "/mnt/disk/boot/grub/stage1")
+            shutil.copy("/usr/share/grub/stage2", "/mnt/disk/boot/grub/stage2")
 
-        # FIXME: hard coded
-        grubconf = GRUB % (self.targetdisk)
-        f = open(grub_file, 'w')
-        f.write(grubconf)
-        f.close()
+            # FIXME: hard coded
+            grubconf = GRUB % (self.targetdisk)
+            f = open(grub_file, 'w')
+            f.write(grubconf)
+            f.close()
 
-        # grub-install here.
-        try:
-            process = subprocess.Popen('/usr/bin/grub-install',
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                shell=True)
-            process.wait()
-        except:
-            os.system("/bin/bash")
+            # grub-install here.
+            try:
+                process = subprocess.Popen('/usr/bin/grub-install',
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.STDOUT,
+                                           shell=True)
+                process.wait()
+            except:
+                os.system("/bin/bash")
+
+        self.screen.gauge_update(50)
+        time.sleep(2)
+        self.screen.gauge_stop()
 
     def finalSteps(self):
-        congrats = CongratsWindow()
-        congrats(self.screen, 0)
+        self.screen.msgbox(MSG_REBOOT, None, None)
+        if self.options.devel:
+            print("End of simulation (Dev mode). Bye!")
+
 
 def main():
-    if not enoughMemory():
-        return 0
-
-    log.info("Installer runnting, good luck!")
-
-    installer = Installer()
-
-    return 0
-
-if __name__ == "__main__":
-    setupPythonPath()
-    options = parseArgs()
+    setup_python_path()
+    options = parse_args()
 
     # Custom imports here after custom paths enabled
     if not options.devel:
@@ -735,7 +580,6 @@ if __name__ == "__main__":
         import isys
         import parted
         import minihal
-        from constants import *
 
     if options.devel:
         print("Devel mode enabled!")
@@ -744,10 +588,15 @@ if __name__ == "__main__":
         print("Verbose mode enabled!")
         print("logging file: /tmp/anaconda.log")
 
-    logging.basicConfig(filename='/tmp/anaconda.log',level=logging.DEBUG)
+    logging.basicConfig(filename='/tmp/anaconda.log', level=logging.DEBUG)
     log = logging.getLogger("anaconda")
 
+    log.info("Installer runnting, good luck!")
+
+    installer = Installer(options)
+
+    return 0
+
+
+if __name__ == "__main__":
     sys.exit(main())
-
-# vim: ts=4:sw=4:et:sts=4:ai:tw=80
-
