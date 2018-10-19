@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# vim: ts=4:sw=4:et:sts=4:ai:tw=80
 
 # Only we can run being superuser, by now.
-#[ `id -u` != "0" ] && echo "You must be root!" && exit
+[ `id -u` != "0" ] && echo "You must be root!" && exit
 
 usage () {
-    echo "usage: mk-installer.sh [<cleanall>]"
+    echo "usage: mk-installer.sh [--clean | --cleanall]"
 	exit 0
 }
 
@@ -66,11 +67,19 @@ while [ $# -gt 0 ]; do
 done
 
 #
+# Install environment requirements (tools)
+#
+./_mk-env.sh
+
+#
 # syslinux related stuff.
 #
 ./_mk-bootdisk.sh
-[ $? = 1 ] && echo "ERROR Undefined, _mk-cdrom and _run-install skipped" && exit 1
+[ $? = 1 ] && \
+    echo "ERROR Undefined, _mk-cdrom and _run-install skipped" && \
+    exit 1
 
+exit
 #
 # final ISO cd image.
 #
@@ -81,4 +90,3 @@ done
 #
 ./_run-install.sh 
 
-# vim: ts=4:sw=4:et:sts=4:ai:tw=80

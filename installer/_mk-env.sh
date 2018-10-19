@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+dnf group install -y -q "Development Tools"
+
+dnf install -y -q audit-libs-devel \
+isomd5sum-devel \
+NetworkManager-devel \
+squashfs-tools \
+e2fsprogs-devel \
+popt-devel \
+libblkid-devel \
+libX11-devel \
+libnl3-devel \
+newt-devel \
+device-mapper-devel \
+python \
+python-devel \
+zlib-devel \
+redhat-lsb-core \
+dmraid-devel \
+net-tools \
+nfs-utils \
+strace \
+tree \
+gdb \
+grub2-tools \
+parted-devel \
+audit-libs-devel \
+e2fsprogs-devel \
+popt-devel \
+libblkid-devel \
+libnl3-devel \
+NetworkManager-glib-devel \
+device-mapper-devel \
+dmraid-devel \
+python2-dialog

@@ -1,75 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# vim: ts=4:sw=4:et:sts=4:ai:tw=80
 
-# FIXME: we have to use OE binaries, this script is for early 
-# development stages, and is fully dependent of Fedora 10 system.
-#
-#
-# File logs stages:
-# 1. setup
-# 2. 
+source include/variables.env
 
-#exec 2> build.log
-
-# set "1" as parameter for testing init process, empty otherwise
-TESTING=
-
-LANG=C
-DEBUG=1
-
-CUR_PWD=$PWD
-TOP_DIR=$PWD
-TMPDIR=${TMPDIR:-/tmp}
-
-# temporal folders for stage-1 (initrd.img)
-MKB_DIR=$TMPDIR/comodoo-$$.mk-bootdisk/initrd
-MKB_SYSLINUX=$TMPDIR/comodoo-$$.mk-bootdisk/syslinux
-MKB_FSIMAGE=$TMPDIR/comodoo-$$.mk-bootdisk/initrdimage
-MKB_BOOTTREE=CD
-
-# temporal folders for stage-2 (install.img)
-TOPDESTPATH=CD
-INSTIMGPATH=$TOPDESTPATH/images
-IMGPATH=/tmp/dir
-
-# .buildstamp file: Architecture, product name, product version.
-IMAGEUUID=$(date +%Y%m%d%H%M).$(uname -i)
-PRODUCT="Comodoo"
-VERSION="1"
-DSO_DEPS=""
-LDSO=""
-
-# yoctoproject bsp files expansion
-BZIMAGE=$(ls yocto | grep bzImage)
-ROOTFS=$(ls yocto | grep core)
-MODULES=$(ls yocto | grep modules)
-
-# Ubuntu 12 and Fedora 10 were tested for this installation
-DISTRO=`lsb_release -irc | grep ID | cut -d':' -f2 | tr -d [[:space:]]`
-
-rm -fr ${TOP_DIR}/logs
-mkdir ${TOP_DIR}/logs
-cat <<! > logs/setup
-Comodoo installer utility. Setup:
-
-TOP_DIR      = $TOP_DIR
-TESTING      = $TESTING
-DEBUG        = $DEBUG
-TMPDIR       = $TMPDIR
-MKB_DIR      = $MKB_DIR
-MKB_SYSLINUX = $MKB_SYSLINUX
-MKB_FSIMAGE  = $MKB_FSIMAGE
-MKB_BOOTTREE = $MKB_BOOTTREE
-TOPDESTPATH  = $TOPDESTPATH
-INSTIMGPATH  = $INSTIMGPATH
-IMGPATH      = $IMGPATH
-IMAGEUUID    = $IMAGEUUID
-PRODUCT      = $PRODUCT
-VERSION      = $VERSION
-BZIMAGE      = $BZIMAGE
-ROOTFS       = $ROOTFS
-MODULES      = $MODULES
-DISTRO       = $DISTRO
-!
 #############################################################
 #                Functions
 #############################################################
@@ -121,15 +54,15 @@ extract_to_keepfile() {
 
     set_value_distro "dpkg -L" "rpm -ql"
 
-    $value $1 | grep -v -E "pyo|doc|man"  > /tmp/in-keep.tmp
-    for i in $(cat /tmp/in-keep.tmp);do
+    $value $1 | grep -v -E "pyo|doc|man"  > tmp/in-keep.tmp
+    for i in $(cat tmp/in-keep.tmp);do
         if [ -d $i ]; then
             continue
         else
             echo $i
         fi
     done
-    rm -f /tmp/in-keep.tmp 2> /dev/null
+    rm -f tmp/in-keep.tmp 2> /dev/null
 }
 
 #
@@ -164,8 +97,7 @@ get_dso_deps() {
         FILES[$n]="$FILE"
         let n++
     done << EOF
-        $(env LD_TRACE_PRELINKING=1 LD_WARN= \
-            LD_TRACE_LOADED_OBJECTS=1 $LDSO $bin)
+$(env LD_TRACE_PRELINKING=1 LD_WARN= LD_TRACE_LOADED_OBJECTS=1 $LDSO $bin)
 EOF
 
     [ ${#FILES[*]} -eq 0 ] && return 1
@@ -226,7 +158,7 @@ instbin() {
     DEST=$4
 
     install -s -m 755 $ROOT/$BIN $DIR/$DEST
-    # TESTING install -m 755 $ROOT/$BIN $DIR/$DEST
+    # NO STRIP FOR TESTING: install -m 755 $ROOT/$BIN $DIR/$DEST
     get_dso_deps $ROOT "$BIN"
     local DEPS="$DSO_DEPS"
     mkdir -p $DIR/lib
@@ -272,8 +204,8 @@ makeproductfile() {
 makemainimage () {
     imagename=$1
     type=$2
-    mmi_tmpimage=$TMPDIR/instimage.img.$$
-    mmi_mntpoint=$TMPDIR/instimage.mnt.$$
+    mmi_tmpimage=$TMP_DIR/instimage.img.$$
+    mmi_mntpoint=$TMP_DIR/instimage.mnt.$$
     
     rm -rf $mmi_tmpimage $mmi_mntpoint
     mkdir $mmi_mntpoint
@@ -377,7 +309,7 @@ makeSecondStage() {
     echo_note "WARNING" "Second stage population (stage-2) python based ..."
     echo_note "WARNING" "Building install.img"
 
-KEEPFILE=${TMPDIR:-/tmp}/keepfile.$$
+KEEPFILE=${TMP_DIR:-tmp}/keepfile.$$
 cat > $KEEPFILE <<EOF
 /usr/share/dbus-1/
 /usr/lib/dbus-1.0/
@@ -589,8 +521,8 @@ extract_to_keepfile libc >> $KEEPFILE
 extract_to_keepfile libc-bin >> $KEEPFILE
 extract_to_keepfile libc6 >> $KEEPFILE
 
-rm -fr /tmp/dir
-PKGDEST=/tmp/dir
+rm -fr tmp/dir
+PKGDEST=tmp/dir
 mkdir $PKGDEST
 echo_note "WARNING" "populate $PKGDEST ..."
 
@@ -687,7 +619,7 @@ EOF
 chmod 755 $PKGDEST/usr/bin/grub-install
 echo_note "OK" "[OK]"
 
-rm -rf $PKGDEST/boot $PKGDEST/home $PKGDEST/root $PKGDEST/tmp
+rm -rf $PKGDEST/boot $PKGDEST/home $PKGDEST/root $PKGDESTtmp
 
 find $PKGDEST -name "*.a" | grep -v kernel-wrapper/wrapper.a | xargs rm -rf
 find $PKGDEST -name "lib*.la" |grep -v "usr/$LIBDIR/gtk-2.0" | xargs rm -rf
@@ -706,7 +638,7 @@ find $PKGDEST -name "*.py" | while read fn; do
     ln -sf /dev/null ${fn}c
 done
 
-rm -fr /tmp/dir/var/run/dbus/system_bus_socket
+rm -fr tmp/dir/var/run/dbus/system_bus_socket
 
 # some python stuff we don't need for install image
 rm -rf $PKGDEST/usr/lib/python?.?/site-packages/distutils/
@@ -770,22 +702,55 @@ populate_anaconda() {
     exit 0
 }
 
+bootstrap() {
+    [[ -d $TMP_DIR ]] || mkdir $TMP_DIR
+    [[ -d $LOGS_DIR ]] || mkdir $LOGS_DIR
+    [[ -d $STAGING_DIR ]] || mkdir $STAGING_DIR
+
+    cat <<! > ${TMP_DIR}/setup
+Comodoo installer utility. Setup:
+
+TOP_DIR      = $TOP_DIR
+TESTING      = $TESTING
+DEBUG        = $DEBUG
+TMP_DIR       = $TMP_DIR
+MKB_DIR      = $MKB_DIR
+MKB_SYSLINUX = $MKB_SYSLINUX
+MKB_FSIMAGE  = $MKB_FSIMAGE
+MKB_BOOTTREE = $MKB_BOOTTREE
+TOPDESTPATH  = $TOPDESTPATH
+INSTIMGPATH  = $INSTIMGPATH
+IMGPATH      = $IMGPATH
+IMAGEUUID    = $IMAGEUUID
+PRODUCT      = $PRODUCT
+VERSION      = $VERSION
+BZIMAGE      = $BZIMAGE
+ROOTFS       = $ROOTFS
+MODULES      = $MODULES
+DISTRO       = $DISTRO
+!
+}
+
 ####################################################
 #                     Main 
 ####################################################
+
+echo_note "WARNING" "Old temporary files housekepping ..."
+rm -fr $TMP_DIR/* 2> /dev/null
+echo_note "OK" "[OK]"
+
+bootstrap
+
+set -xe
+exec 5> ${LOGS_DIR}/$BASH_LOG_FILE
+BASH_XTRACEFD="5"
+PS4='$LINENO: '
+
 [ ! -z $1 ] && populate_anaconda $1
 
 #
 # Zero stage population (stage-0): syslinux phase
 #
-echo_note "WARNING" "Old temporary files housekepping ..."
-
-rm -fr $TMPDIR/comodoo-* 2> /dev/null
-rm -fr $TMPDIR/dir 2> /dev/null
-rm -rf $MKB_DIR  2> /dev/null
-rm -fr $TMPDIR/comodoo-* 2> /dev/null
-echo_note "OK" "[OK]"
-
 echo_note "WARNING" "Making folder scheme ..."
 mkdir -p $INSTIMGPATH
 mkdir -p $MKB_SYSLINUX
@@ -842,8 +807,8 @@ echo_note "OK" "[OK]"
 #   own "init" process and "loader" of second stage.
 #
 echo_note "WARNING" "isys building ...."
-echo "############### isys #########" >> ${TOP_DIR}/logs/build
-make -C isys &>> ${TOP_DIR}/logs/build
+echo "############### isys #########" >> ${LOGS_DIR}/build.log
+make -C isys &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
     echo_note "OK" "[OK]"
 else
@@ -851,8 +816,8 @@ else
 fi
 
 echo_note "WARNING" "isomd5sum building ...."
-echo "############### isomd5sum #########" >> ${TOP_DIR}/logs/build
-make -C isomd5sum &>> ${TOP_DIR}/logs/build
+echo "############### isomd5sum #########"  >> ${LOGS_DIR}/build.log
+make -C isomd5sum &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
     echo_note "OK" "[OK]"
 else
@@ -860,8 +825,8 @@ else
 fi
 
 echo_note "WARNING" "stage-1 building...."
-echo "############### stage-1 #########" >> ${TOP_DIR}/logs/build
-make -C stage-1 &>> ${TOP_DIR}/logs/build
+echo "############### stage-1 #########" >> ${LOGS_DIR}/build.log
+make -C stage-1 &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
     echo_note "OK" "[OK]"
 else
@@ -869,8 +834,8 @@ else
 fi
 
 echo_note "WARNING" "pyblock building...."
-echo "############### stage-1 #########" >> ${TOP_DIR}/logs/build
-make -C pyblock &>> ${TOP_DIR}/logs/build
+echo "############### stage-1 #########" >> ${LOGS_DIR}/build.log
+make -C pyblock &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
     echo_note "OK" "[OK]"
 else
@@ -878,11 +843,13 @@ else
 fi
 
 echo_note "WARNING" "Install init in $MKB_DIR/sbin/init"
-instbin / $PWD/stage-1/init  $MKB_DIR /sbin/init &>> ${TOP_DIR}/logs/init-loader
+instbin $PWD/stage-1 init \
+    $MKB_DIR /sbin/init &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "Install init in $MKB_DIR/sbin/loader"
-instbin / $PWD/stage-1/loader $MKB_DIR /sbin/loader &>> ${TOP_DIR}/logs/init-loader
+instbin $PWD/stage-1 loader \
+    $MKB_DIR /sbin/loader &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
 cd $MKB_DIR/sbin
@@ -904,16 +871,15 @@ ps gdb netstat test less"
 
 # TODO: nash missing
 # TODO: grub missing
-INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk \
+INSTALL_SBIN="blockdev chroot dmsetup eject fdisk \
 insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
 modprobe parted partprobe pidof reboot sfdisk shutdown ip \
 udevadm consoletype logger"
 
-
 echo_note "WARNING" "$MKB_DIR population ..."
 for i in $INSTALL_BIN
 do
-    instbin / `which $i` $MKB_DIR /bin/$i &>> ${TOP_DIR}/logs/initrd-population
+    instbin / `which $i` $MKB_DIR /bin/$i &>> ${LOGS_DIR}/init-loader.log
 done
 
 for i in $INSTALL_SBIN
@@ -925,7 +891,7 @@ instbin / `which python` $MKB_DIR /usr/bin/python &>> ${TOP_DIR}/logs/initrd-pop
 instbin / `which load_policy` $MKB_DIR /usr/sbin/load_policy &>> ${TOP_DIR}/logs/initrd-population
 
 
-KEEPFILERD=${TMPDIR:-/tmp}/keepfilerd.$$
+KEEPFILERD=${TMP_DIR:-tmp}/keepfilerd.$$
 
 extract_to_keepfile hal >> $KEEPFILERD
 extract_to_keepfile passwd >> $KEEPFILERD
@@ -1005,15 +971,15 @@ if [ -z ${ROOTFS} ]; then
     exit 1
 fi
 
-mkdir yocto/tmp
-mkdir -p yocto/tmp2/lib
-tar xvzf yocto/${ROOTFS} -C yocto/tmp &>> ${TOP_DIR}/logs/modules
-mv yocto/tmp/lib/modules yocto/tmp2/lib &>> ${TOP_DIR}/logs/modules
-cd yocto/tmp2
+mkdir yoctotmp
+mkdir -p yoctotmp2/lib
+tar xvzf yocto/${ROOTFS} -C yoctotmp &>> ${TOP_DIR}/logs/modules
+mv yoctotmp/lib/modules yoctotmp2/lib &>> ${TOP_DIR}/logs/modules
+cd yoctotmp2
 tar cvzf ../${MODULES} lib &>> ${TOP_DIR}/logs/modules
 cd ../..
-rm -fr yocto/tmp
-rm -fr yocto/tmp2
+rm -fr yoctotmp
+rm -fr yoctotmp2
 tar xzf yocto/${MODULES} -C $MKB_DIR &>> ${TOP_DIR}/logs/modules
 echo_note "OK" "[OK]"
 
@@ -1157,7 +1123,7 @@ ln -s /bin/bash $MKB_DIR/bin/sh
 ln -s /proc/mounts $MKB_DIR/etc/mtab
 ln -s sbin $MKB_DIR/bin
 mkdir -p $MKB_DIR/var/lib
-ln -s ../../tmp $MKB_DIR/var/lib/xkb
+ln -s ../..tmp $MKB_DIR/var/lib/xkb
 
 cat > $MKB_DIR/.profile <<EOF
 PATH=/sbin:/bin:/usr/bin:/usr/sbin:/mnt/sysimage/sbin:/mnt/sysimage/usr/sbin:/mnt/sysimage/bin:/mnt/sysimage/usr/bin
@@ -1199,5 +1165,4 @@ echo_note "OK" "[OK]"
 #
 makeSecondStage
 
-# vim: ts=4:sw=4:et:sts=4:ai:tw=80
 
