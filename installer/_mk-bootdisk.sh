@@ -2,33 +2,11 @@
 # vim: ts=4:sw=4:et:sts=4:ai:tw=80
 
 source include/variables.env
+source include/functions.env
 
 #############################################################
 #                Functions
 #############################################################
-
-#
-# echo_note
-#
-echo_note() {
-    case $1 in
-        "WARNING")
-            Message="\x1B[31;93m$2\x1B[0m"
-            ;;
-        "OK")
-            Message="\x1B[31;92m$2\x1B[0m"
-            ;;
-        "ERROR")
-            Message="\x1B[31;91m$2\x1B[0m"
-            ;;
-        *)
-            ;;
-    esac
-
-    echo -e $Message
-}
-
-
 #
 # set_value_distro
 #
@@ -736,13 +714,13 @@ DISTRO       = $DISTRO
 ####################################################
 
 echo_note "WARNING" "Old temporary files housekepping ..."
-rm -fr $TMP_DIR/* 2> /dev/null
+rm -fr ${TMP_DIR}/* 2> /dev/null
 echo_note "OK" "[OK]"
 
 bootstrap
 
 set -xe
-exec 5> ${LOGS_DIR}/$BASH_LOG_FILE
+exec 5> ${LOGS_DIR}/${BASH_LOG_FILE}
 BASH_XTRACEFD="5"
 PS4='$LINENO: '
 
@@ -752,51 +730,51 @@ PS4='$LINENO: '
 # Zero stage population (stage-0): syslinux phase
 #
 echo_note "WARNING" "Making folder scheme ..."
-mkdir -p $INSTIMGPATH
-mkdir -p $MKB_SYSLINUX
-mkdir -p $MKB_DIR/sbin
-mkdir -p $MKB_DIR/bin
-mkdir -p $MKB_DIR/dev
-mkdir -p $MKB_DIR/etc
-mkdir -p $MKB_DIR/etc/rc.d/init.d
-mkdir -p $MKB_DIR/etc/udev/rules.d
-mkdir -p $MKB_DIR/lib/udev/rules.d
-mkdir -p $MKB_DIR/etc/modprobe.d
-mkdir -p $MKB_DIR/etc/terminfo/{a,b,d,l,s,v,x}
-mkdir -p $MKB_DIR/etc/sysconfig/network-scripts
-mkdir -p $MKB_DIR/usr/libexec
-mkdir -p $MKB_DIR/usr/sbin
-mkdir -p $MKB_DIR/usr/bin
-mkdir -p $MKB_DIR/usr/lib
-mkdir -p $MKB_DIR/proc
-mkdir -p $MKB_DIR/selinux
-mkdir -p $MKB_DIR/sys
-mkdir -p $MKB_DIR/tmp
-mkdir -p $MKB_DIR/var/lib/dhclient
-mkdir -p $MKB_DIR/var/run
-mkdir -p $MKB_DIR/var/lib/misc
-mkdir -p $MKB_DIR/usr/share/grub/
-mkdir -p $MKB_DIR/etc/dbus-1/system.d
-mkdir -p $MKB_DIR/usr/share/dbus-1/system-services
-mkdir -p $MKB_DIR/lib/dbus-1
-mkdir -p $MKB_DIR/var/run/dbus
-mkdir -p $MKB_DIR/var/lib/dbus
-mkdir -p $MKB_DIR/etc/NetworkManager/dispatcher.d
-mkdir -p $MKB_DIR/usr/lib/NetworkManager
-mkdir -p $MKB_DIR/var/run/NetworkManager
-mkdir -p $MKB_DIR/etc/PolicyKit
-mkdir -p $MKB_DIR/usr/share/PolicyKit/policy
-mkdir -p $MKB_DIR/etc/hal/fdi
-mkdir -p $MKB_DIR/usr/share/hal/fdi
-mkdir -p $MKB_DIR/usr/share/hwdata
-mkdir -p $MKB_DIR/var/cache/hald
+mkdir -p ${INSTIMGPATH}
+mkdir -p ${MKB_SYSLINUX}
+mkdir -p ${MKB_DIR}/sbin
+mkdir -p ${MKB_DIR}/bin
+mkdir -p ${MKB_DIR}/dev
+mkdir -p ${MKB_DIR}/etc
+mkdir -p ${MKB_DIR}/etc/rc.d/init.d
+mkdir -p ${MKB_DIR}/etc/udev/rules.d
+mkdir -p ${MKB_DIR}/lib/udev/rules.d
+mkdir -p ${MKB_DIR}/etc/modprobe.d
+mkdir -p ${MKB_DIR}/etc/terminfo/{a,b,d,l,s,v,x}
+mkdir -p ${MKB_DIR}/etc/sysconfig/network-scripts
+mkdir -p ${MKB_DIR}/usr/libexec
+mkdir -p ${MKB_DIR}/usr/sbin
+mkdir -p ${MKB_DIR}/usr/bin
+mkdir -p ${MKB_DIR}/usr/lib
+mkdir -p ${MKB_DIR}/proc
+mkdir -p ${MKB_DIR}/selinux
+mkdir -p ${MKB_DIR}/sys
+mkdir -p ${MKB_DIR}/tmp
+mkdir -p ${MKB_DIR}/var/lib/dhclient
+mkdir -p ${MKB_DIR}/var/run
+mkdir -p ${MKB_DIR}/var/lib/misc
+mkdir -p ${MKB_DIR}/usr/share/grub/
+mkdir -p ${MKB_DIR}/etc/dbus-1/system.d
+mkdir -p ${MKB_DIR}/usr/share/dbus-1/system-services
+mkdir -p ${MKB_DIR}/lib/dbus-1
+mkdir -p ${MKB_DIR}/var/run/dbus
+mkdir -p ${MKB_DIR}/var/lib/dbus
+mkdir -p ${MKB_DIR}/etc/NetworkManager/dispatcher.d
+mkdir -p ${MKB_DIR}/usr/lib/NetworkManager
+mkdir -p ${MKB_DIR}/var/run/NetworkManager
+mkdir -p ${MKB_DIR}/etc/PolicyKit
+mkdir -p ${MKB_DIR}/usr/share/PolicyKit/policy
+mkdir -p ${MKB_DIR}/etc/hal/fdi
+mkdir -p ${MKB_DIR}/usr/share/hal/fdi
+mkdir -p ${MKB_DIR}/usr/share/hwdata
+mkdir -p ${MKB_DIR}/var/cache/hald
 echo_note "OK" "[OK]"
 
 #
 # syslinux building phase
 #
 echo_note "WARNING" "syslinux installation ...."
-cd $CUR_PWD
+cd ${CUR_PWD}
 cp -a addons/isolinux ${MKB_SYSLINUX}
 cp syslinux/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
 cp syslinux/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
@@ -842,21 +820,21 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
-echo_note "WARNING" "Install init in $MKB_DIR/sbin/init"
-instbin $PWD/stage-1 init \
-    $MKB_DIR /sbin/init &>> ${LOGS_DIR}/init-loader.log
+echo_note "WARNING" "Install init in ${MKB_DIR}/sbin/init"
+instbin ${PWD}/stage-1 init \
+    ${MKB_DIR} /sbin/init &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "Install init in $MKB_DIR/sbin/loader"
-instbin $PWD/stage-1 loader \
-    $MKB_DIR /sbin/loader &>> ${LOGS_DIR}/init-loader.log
+echo_note "WARNING" "Install init in ${MKB_DIR}/sbin/loader"
+instbin ${PWD}/stage-1 loader \
+    ${MKB_DIR} /sbin/loader &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
-cd $MKB_DIR/sbin
-ln -s ./init  $MKB_DIR/sbin/reboot
-ln -s ./init  $MKB_DIR/sbin/halt
-ln -s ./init  $MKB_DIR/sbin/poweroff
-cd $TOP_DIR
+cd ${MKB_DIR}/sbin
+ln -s ./init  ${MKB_DIR}/sbin/reboot
+ln -s ./init  ${MKB_DIR}/sbin/halt
+ln -s ./init  ${MKB_DIR}/sbin/poweroff
+cd ${TOP_DIR}
 
 cp pyblock/dmmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmmodule.so
 cp pyblock/dmraidmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmraidmodule.so

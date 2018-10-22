@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-dnf group install -y -q "Development Tools"
+source include/functions.env
 
+echo_note "WARNING" "Installing Development Tools"
+dnf group install -y -q "Development Tools"
+echo_note "OK" "Packages installed!"
+
+echo_note "WARNING" "Installing Dependency packages"
 dnf install -y -q audit-libs-devel \
 isomd5sum-devel \
 NetworkManager-devel \
@@ -34,3 +39,6 @@ NetworkManager-glib-devel \
 device-mapper-devel \
 dmraid-devel \
 python2-dialog
+
+echo_note "OK" "Packages installed!"
+
