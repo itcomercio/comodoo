@@ -26,3 +26,8 @@ installer/logs/*
 .idea/
 *.pyc
 tmp
+bzImage
+*.img
+yoctotmp
+yoctotmp2
+CD

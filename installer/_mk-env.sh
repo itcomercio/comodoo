@@ -38,7 +38,11 @@ libnl3-devel \
 NetworkManager-glib-devel \
 device-mapper-devel \
 dmraid-devel \
-python2-dialog
+python2-dialog \
+dhcp-client \
+e2fsprogs \
+policycoreutils \
+genisoimage
 
 echo_note "OK" "Packages installed!"
 

@@ -18,6 +18,9 @@ set_value_distro () {
     "CentOS")
         value="$2"
         ;;
+    "Fedora")
+        value="$2"
+        ;;
     *)
         echo "No distro foundª"
         exit 1
@@ -190,14 +193,17 @@ makemainimage () {
 
     if [ $type = "ext2" ]; then
         SIZE=$(du -sk $IMGPATH | awk '{ print int($1 * 1.1) }')
+
         if [ -d $IMGPATH/usr/lib/anaconda-runtime ]; then
-        ERROR=$(du -sk $IMGPATH/usr/lib/anaconda-runtime | awk '{ print $1 }')
-        SIZE=$(expr $SIZE - $ERROR)
+            ERROR=$(du -sk $IMGPATH/usr/lib/anaconda-runtime | awk '{ print $1 }')
+            SIZE=$(expr $SIZE - $ERROR)
         fi
+
         if [ -d $IMGPATH/usr/lib/syslinux ]; then
-        ERROR=$(du -sk $IMGPATH/usr/lib/syslinux | awk '{ print $1 }')
-        SIZE=$(expr $SIZE - $ERROR)
+            ERROR=$(du -sk $IMGPATH/usr/lib/syslinux | awk '{ print $1 }')
+            SIZE=$(expr $SIZE - $ERROR)
         fi
+
         dd if=/dev/zero bs=1k count=${SIZE} of=$mmi_tmpimage 2>/dev/null
         mke2fs -q -F $mmi_tmpimage > /dev/null 
         tune2fs -c0 -i0 $mmi_tmpimage >/dev/null
@@ -207,6 +213,7 @@ makemainimage () {
             fgrep -v "./usr/lib/anaconda-runtime" |
             fgrep -v "./usr/lib/syslinux"
             cpio -H crc -o) | (cd $mmi_mntpoint; cpio -iumd)
+
         makeproductfile $mmi_mntpoint
         umount $mmi_mntpoint
         rmdir $mmi_mntpoint
@@ -284,8 +291,8 @@ instDir() {
 #
 makeSecondStage() {
     echo "[stage2]" >> $TOPDESTPATH/.treeinfo
-    echo_note "WARNING" "Second stage population (stage-2) python based ..."
-    echo_note "WARNING" "Building install.img"
+    echo_note "WARNING" "[016] Second stage population python based (stage-2)"
+    echo_note "WARNING" "[017] Building install.img"
 
 KEEPFILE=${TMP_DIR:-tmp}/keepfile.$$
 cat > $KEEPFILE <<EOF
@@ -499,8 +506,8 @@ extract_to_keepfile libc >> $KEEPFILE
 extract_to_keepfile libc-bin >> $KEEPFILE
 extract_to_keepfile libc6 >> $KEEPFILE
 
-rm -fr tmp/dir
-PKGDEST=tmp/dir
+rm -fr ${TOP_DIR}/tmp/dir
+PKGDEST=${TOP_DIR}/tmp/dir
 mkdir $PKGDEST
 echo_note "WARNING" "populate $PKGDEST ..."
 
@@ -521,12 +528,12 @@ udevadm consoletype logger"
 
 for i in $INSTALL_BIN
 do
-    instbin / `which $i` $PKGDEST /bin/$i &>> ${TOP_DIR}/logs/second-stage
+    instbin / `which $i` $PKGDEST /bin/$i &>> ${LOGS_DIR}/second-stage.log
 done
 
 for i in $INSTALL_SBIN
 do
-    instbin / `which $i` $PKGDEST /sbin/$i &>> ${TOP_DIR}/logs/second-stage
+    instbin / `which $i` $PKGDEST /sbin/$i &>> ${LOGS_DIR}/second-stage.log
 done
 
 cat $KEEPFILE | while read spec ; do
@@ -535,14 +542,14 @@ cat $KEEPFILE | while read spec ; do
         if [ ! -e $filespec ]; then
             continue
         elif [ ! -d $filespec ]; then
-            instFile $filespec $PKGDEST &>> ${TOP_DIR}/logs/second-stage
+            instFile $filespec $PKGDEST &>> ${LOGS_DIR}/second-stage.log
         else
             for i in `find $filespec -type f 2> /dev/null` ; do 
-            instFile $i $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
+            instFile $i $PKGDEST &>> ${LOGS_DIR}/second-stage.log ; done
             for i in `find $filespec -type l 2> /dev/null` ; do 
-            instFile $i $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
+            instFile $i $PKGDEST &>> ${LOGS_DIR}/second-stage.log ; done
             for d in `find $filespec -type d 2> /dev/null` ; do 
-            instDir $d $PKGDEST &>> ${TOP_DIR}/logs/second-stage ; done
+            instDir $d $PKGDEST &>> ${LOGS_DIR}/second-stage.log ; done
         fi
     done
 done
@@ -550,8 +557,8 @@ done
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "copy anaconda installer to $PKGDEST/usr/bin/"
-cp stage-2/anaconda $PKGDEST/usr/bin/
-cp isys/_isys.so stage-2/usr/lib/anaconda/
+cp ${TOP_DIR}/stage-2/anaconda $PKGDEST/usr/bin/
+cp ${TOP_DIR}/isys/_isys.so stage-2/usr/lib/anaconda/
 mv $PKGDEST/bin/* $PKGDEST/usr/bin
 echo_note "OK" "[OK]"
 
@@ -575,7 +582,7 @@ pushd $PKGDEST/lib
 ln -s libdevmapper.so.1.02.1 libdevmapper.so.1.02
 popd
 
-pushd stage-2 
+pushd ${TOP_DIR}/stage-2
 cp -a usr/ $PKGDEST
 popd
 
@@ -719,7 +726,9 @@ echo_note "OK" "[OK]"
 
 bootstrap
 
-set -xe
+cat ${TMP_DIR}/setup
+
+set -x
 exec 5> ${LOGS_DIR}/${BASH_LOG_FILE}
 BASH_XTRACEFD="5"
 PS4='$LINENO: '
@@ -729,7 +738,7 @@ PS4='$LINENO: '
 #
 # Zero stage population (stage-0): syslinux phase
 #
-echo_note "WARNING" "Making folder scheme ..."
+echo_note "WARNING" "[001] Making folder scheme ..."
 mkdir -p ${INSTIMGPATH}
 mkdir -p ${MKB_SYSLINUX}
 mkdir -p ${MKB_DIR}/sbin
@@ -773,7 +782,7 @@ echo_note "OK" "[OK]"
 #
 # syslinux building phase
 #
-echo_note "WARNING" "syslinux installation ...."
+echo_note "WARNING" "[002] syslinux installation ...."
 cd ${CUR_PWD}
 cp -a addons/isolinux ${MKB_SYSLINUX}
 cp syslinux/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
@@ -784,7 +793,7 @@ echo_note "OK" "[OK]"
 # First stage population (stage-1):
 #   own "init" process and "loader" of second stage.
 #
-echo_note "WARNING" "isys building ...."
+echo_note "WARNING" "[003] isys building ...."
 echo "############### isys #########" >> ${LOGS_DIR}/build.log
 make -C isys &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
@@ -793,7 +802,7 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
-echo_note "WARNING" "isomd5sum building ...."
+echo_note "WARNING" "[004] isomd5sum building ...."
 echo "############### isomd5sum #########"  >> ${LOGS_DIR}/build.log
 make -C isomd5sum &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
@@ -802,7 +811,7 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
-echo_note "WARNING" "stage-1 building...."
+echo_note "WARNING" "[005] stage-1 building...."
 echo "############### stage-1 #########" >> ${LOGS_DIR}/build.log
 make -C stage-1 &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
@@ -811,7 +820,7 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
-echo_note "WARNING" "pyblock building...."
+echo_note "WARNING" "[006] pyblock building...."
 echo "############### stage-1 #########" >> ${LOGS_DIR}/build.log
 make -C pyblock &>> ${LOGS_DIR}/build.log
 if [ $? = 0 ];then
@@ -820,12 +829,12 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
-echo_note "WARNING" "Install init in ${MKB_DIR}/sbin/init"
+echo_note "WARNING" "[007] Install init in ${MKB_DIR}/sbin/init"
 instbin ${PWD}/stage-1 init \
     ${MKB_DIR} /sbin/init &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "Install init in ${MKB_DIR}/sbin/loader"
+echo_note "WARNING" "[008] Install init in ${MKB_DIR}/sbin/loader"
 instbin ${PWD}/stage-1 loader \
     ${MKB_DIR} /sbin/loader &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
@@ -854,19 +863,27 @@ insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
 modprobe parted partprobe pidof reboot sfdisk shutdown ip \
 udevadm consoletype logger"
 
-echo_note "WARNING" "$MKB_DIR population ..."
-for i in $INSTALL_BIN
-do
+echo_note "WARNING" "[009] $MKB_DIR population ..."
+for i in $INSTALL_BIN; do
+        type $i &> /dev/null
+        [ $? != 0 ] && echo "ERROR $i not in path" && exit
+done
+
+for i in $INSTALL_BIN; do
     instbin / `which $i` $MKB_DIR /bin/$i &>> ${LOGS_DIR}/init-loader.log
 done
 
-for i in $INSTALL_SBIN
-do
-    instbin / `which $i` $MKB_DIR /sbin/$i &>> ${TOP_DIR}/logs/initrd-population
+for i in $INSTALL_SBIN; do
+        type $i &> /dev/null
+        [ $? != 0 ] && echo "ERROR $i not in path" && exit
 done
 
-instbin / `which python` $MKB_DIR /usr/bin/python &>> ${TOP_DIR}/logs/initrd-population
-instbin / `which load_policy` $MKB_DIR /usr/sbin/load_policy &>> ${TOP_DIR}/logs/initrd-population
+for i in $INSTALL_SBIN; do
+    instbin / `which $i` $MKB_DIR /sbin/$i &>> ${LOGS_DIR}/initrd-population.log
+done
+
+instbin / `which python` $MKB_DIR /usr/bin/python &>> ${LOGS_DIR}/initrd-population.log
+instbin / `which load_policy` $MKB_DIR /usr/sbin/load_policy &>> ${LOGS_DIR}/initrd-population.log
 
 
 KEEPFILERD=${TMP_DIR:-tmp}/keepfilerd.$$
@@ -883,14 +900,14 @@ cat $KEEPFILERD | while read spec ; do
         if [ ! -e $filespec ]; then
             continue
         elif [ ! -d $filespec ]; then
-            instFile $filespec $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population 
+            instFile $filespec $MKB_DIR &>> ${LOGS_DIR}/initrd-population.log
         else
             for i in `find $filespec -type f 2> /dev/null`; do 
-            instFile $i $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
+            instFile $i $MKB_DIR &>> ${LOGS_DIR}/initrd-population.log ; done
             for i in `find $filespec -type l 2> /dev/null`; do 
-            instFile $i $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
+            instFile $i $MKB_DIR &>> ${LOGS_DIR}/initrd-population.log ; done
             for d in `find $filespec -type d 2> /dev/null`; do 
-            instDir $d $MKB_DIR &>> ${TOP_DIR}/logs/initrd-population ; done
+            instDir $d $MKB_DIR &>> ${LOGS_DIR}/initrd-population.log ; done
         fi
     done
 done
@@ -902,29 +919,28 @@ install -m 644 /etc/udev/udev.conf $MKB_DIR/etc/udev/udev.conf
 for i in /lib/udev/rules.d/*.rules ; do
     install -m 644 $i $MKB_DIR/lib/udev/rules.d/${i##*/}
 done
-for i in /etc/udev/rules.d/*.rules ; do
-    install -m 644 $i $MKB_DIR/etc/udev/rules.d/${i##*/}
-done
+#for i in /etc/udev/rules.d/*.rules ; do
+    #install -m 644 $i $MKB_DIR/etc/udev/rules.d/${i##*/}
+#done
 for i in /lib/udev/*; do
     if [ -f $i ]; then install -m 755 $i $MKB_DIR/lib/udev/${i##*/}; fi
 done
 
 # dbus
-instbin / `which dbus-uuidgen` $MKB_DIR /sbin/dbus-uuidgen &>> ${TOP_DIR}/logs/initrd-population
-instbin / `which dbus-daemon` $MKB_DIR /sbin/dbus-daemon &>> ${TOP_DIR}/logs/initrd-population
+instbin / `which dbus-uuidgen` $MKB_DIR /sbin/dbus-uuidgen &>> ${LOGS_DIR}/initrd-population.log
+instbin / `which dbus-daemon` $MKB_DIR /sbin/dbus-daemon &>> ${LOGS_DIR}/initrd-population.log
 
-#cp -v /home/sarnoso/dbusissue $MKB_DIR/sbin
 cp -a  /etc/dbus-1/system.conf $MKB_DIR/etc/dbus-1/system.conf
 cp -a  /etc/dbus-1/session.conf $MKB_DIR/etc/dbus-1/session.conf
 cp -a -f /etc/dbus-1 $MKB_DIR/etc/
+
 #sudo cp -v -a /usr/lib/dbus-1.0/dbus-daemon-launch-helper $MKB_DIR/lib/dbus-1
-cp -a /usr/lib/dbus-1.0/dbus-daemon-launch-helper $MKB_DIR/lib/dbus-1
+# cp -a /usr/lib/dbus-1.0/dbus-daemon-launch-helper $MKB_DIR/lib/dbus-1
 # sudo chown root:dbus $MKB_DIR/lib/dbus-1/dbus-daemon-launch-helper
 #sudo chown root: $MKB_DIR/lib/dbus-1/dbus-daemon-launch-helper
 #sudo chmod 04750 $MKB_DIR/lib/dbus-1/dbus-daemon-launch-helper
-
-rm -f $MKB_DIR/lib/udev/rules.d/*persistent*
-rm -f $MKB_DIR/lib/udev/rules.d/*generator*
+#rm -f $MKB_DIR/lib/udev/rules.d/*persistent*
+#rm -f $MKB_DIR/lib/udev/rules.d/*generator*
 
 # i18n from anaconda
 KEYMAPS=addons/keymaps-override-x86_64
@@ -937,31 +953,34 @@ install -m 644 $MYLANGTABLE $MKB_DIR/etc/lang-table
 # terminal charset
 for i in a/ansi d/dumb l/linux s/screen v/vt100 v/vt100-nav v/vt102 ; do
     [ -f /lib/terminfo/$i ] && \
-        install -m 644 /lib/terminfo/$i $MKB_DIR/etc/terminfo/$i
+        install -m 644 /usr/share/terminfo/$i $MKB_DIR/etc/terminfo/$i
 done
 
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "kernel modules population for initrd image ..."
+echo_note "WARNING" "[010] kernel modules population for initrd image ..."
 
 if [ -z ${ROOTFS} ]; then
-    echo_note "ERROR" "ERROR: BSP image is no available. Abort!"
+    echo_note "ERROR" "ERROR: BSP image is no available. Exiting!"
     exit 1
 fi
 
-mkdir yoctotmp
-mkdir -p yoctotmp2/lib
-tar xvzf yocto/${ROOTFS} -C yoctotmp &>> ${TOP_DIR}/logs/modules
-mv yoctotmp/lib/modules yoctotmp2/lib &>> ${TOP_DIR}/logs/modules
-cd yoctotmp2
-tar cvzf ../${MODULES} lib &>> ${TOP_DIR}/logs/modules
+echo ${TOP_DIR}/yoctotmp
+mkdir ${TOP_DIR}/yoctotmp
+mkdir -p ${TOP_DIR}/yoctotmp2/lib
+echo "uncompressing ${TOP_DIR}/yocto/${ROOTFS}"
+tar xvzf ${TOP_DIR}/yocto/${ROOTFS} -C yoctotmp &>> ${LOGS_DIR}/modules.log
+mv ${TOP_DIR}/yoctotmp/lib/modules yoctotmp2/lib &>> ${LOGS_DIR}/modules.log
+cd ${TOP_DIR}/yoctotmp2
+
+tar cvzf ../${MODULES} lib &>> ${LOGS_DIR}/modules.log
 cd ../..
 rm -fr yoctotmp
 rm -fr yoctotmp2
-tar xzf yocto/${MODULES} -C $MKB_DIR &>> ${TOP_DIR}/logs/modules
+tar xzf yocto/${MODULES} -C $MKB_DIR &>> ${LOGS_DIR}/modules.log
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "tricky stuff population for initrd image ..."
+echo_note "WARNING" "[011] tricky stuff population for initrd image ..."
 install -m 644 /etc/passwd $MKB_DIR/etc/passwd
 install -m 644 /etc/group $MKB_DIR/etc/group
 install -m 644 /etc/nsswitch.conf $MKB_DIR/etc/nsswitch.conf
@@ -975,23 +994,23 @@ chmod 0755 $MKB_DIR/sbin/dhclient-script
 touch $MKB_DIR/etc/resolv.conf
 
 # hwdata
-cp -a /usr/share/hwdata/pci.ids $MKB_DIR/usr/share/hwdata/pci.ids
-cp -a /usr/share/hwdata/usb.ids $MKB_DIR/usr/share/hwdata/usb.ids
+#cp -a /usr/share/hwdata/pci.ids $MKB_DIR/usr/share/hwdata/pci.ids
+#cp -a /usr/share/hwdata/usb.ids $MKB_DIR/usr/share/hwdata/usb.ids
 
 # hal
-instbin / /usr/sbin/hald $MKB_DIR /sbin/hald &>> ${TOP_DIR}/logs/initrd-population
+#instbin / /usr/sbin/hald $MKB_DIR /sbin/hald &>>  ${TOP_DIR}/logs/initrd-population
 
-set_value_distro "/usr/lib/hal" "/usr/libexec"
+#set_value_distro "/usr/lib/hal" "/usr/libexec"
 
-( cd $value
-      for f in hald-runner hald-generate-fdi-cache hal*storage* ; do
-          instbin / $value/$f $MKB_DIR /usr/libexec/$f &>> ${TOP_DIR}/logs/initrd-population
-      done
-)
-touch $MKB_DIR/var/run/hald.acl-list
-cp -a /usr/share/hal/fdi/* $MKB_DIR/usr/share/hal/fdi
-cp -a /etc/hal/fdi/* $MKB_DIR/etc/hal/fdi
-cp -a /etc/dbus-1/system.d/hal.conf $MKB_DIR/etc/dbus-1/system.d
+#( cd $value
+#      for f in hald-runner hald-generate-fdi-cache hal*storage* ; do
+#          instbin / $value/$f $MKB_DIR /usr/libexec/$f &>> ${TOP_DIR}/logs/initrd-population
+#      done
+#)
+#touch $MKB_DIR/var/run/hald.acl-list
+#cp -a /usr/share/hal/fdi/* $MKB_DIR/usr/share/hal/fdi
+#cp -a /etc/hal/fdi/* $MKB_DIR/etc/hal/fdi
+#cp -a /etc/dbus-1/system.d/hal.conf $MKB_DIR/etc/dbus-1/system.d
 
 # PolicyKit
 cp -a /etc/polkit-1 $MKB_DIR/etc/
@@ -1011,19 +1030,19 @@ cp -a /etc/polkit-1 $MKB_DIR/etc/
 
 # FIXME: http://projects.gnome.org/NetworkManager/developers/api/09/ref-migrating.html
 # NetworkManager
-instbin / /usr/sbin/NetworkManager $MKB_DIR /usr/sbin/NetworkManager &>> ${TOP_DIR}/logs/initrd-population
-instbin / /usr/sbin/nm-system-settings $MKB_DIR /usr/sbin/nm-system-settings &>> ${TOP_DIR}/logs/initrd-population
+instbin / /usr/sbin/NetworkManager $MKB_DIR /usr/sbin/NetworkManager &>> ${LOGS_DIR}/initrd-population.log
+instbin / /usr/sbin/nm-system-settings $MKB_DIR /usr/sbin/nm-system-settings &>> ${LOGS_DIR}/initrd-population.log
 cp -a /etc/dbus-1/system.d/nm-*.conf $MKB_DIR/etc/dbus-1/system.d
 cp -a /etc/dbus-1/system.d/NetworkManager.conf $MKB_DIR/etc/dbus-1/system.d
 cp -a /etc/NetworkManager/nm-system-settings.conf $MKB_DIR/etc/NetworkManager
 ( cd /usr/lib/NetworkManager
       for f in *.so ; do
-          instbin / /usr/lib/NetworkManager/$f $MKB_DIR /usr/lib/NetworkManager/$f &>> ${TOP_DIR}/logs/initrd-population
+          instbin / /usr/lib/NetworkManager/$f $MKB_DIR /usr/lib/NetworkManager/$f &>> ${LOGS_DIR}/initrd-population.log
       done
 )
 ( cd /usr/libexec
       for f in nm-* ; do
-          instbin / /usr/libexec/$f $MKB_DIR /usr/libexec/$f &>> ${TOP_DIR}/logs/initrd-population
+          instbin / /usr/libexec/$f $MKB_DIR /usr/libexec/$f &>> ${LOGS_DIR}/initrd-population.log
       done
 )
 ( cd /usr/share/dbus-1/system-services
@@ -1033,7 +1052,7 @@ cp -a /etc/NetworkManager/nm-system-settings.conf $MKB_DIR/etc/NetworkManager
 
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "sfdisk.in file configuration"
+echo_note "WARNING" "[012] sfdisk.in file configuration"
 # Partitioning
 cat > $MKB_DIR/etc/sfdisk.in <<!
 ,100,S
@@ -1059,6 +1078,7 @@ install -m 755 /lib/x86_64-linux-gnu/libgcc_s.so.1 $MKB_DIR/lib/
 
 makeproductfile $MKB_DIR
 
+echo_note "WARNING" "Creating important symlinks"
 
 if [ ! $TESTING ]; then
     ln -s /sbin/init $MKB_DIR/init
@@ -1109,11 +1129,15 @@ export PATH
 EOF
 
 # initrd ready
-echo_note "WARNING" "Building initrd.img image ...."
-(cd $MKB_DIR; find . | cpio --quiet -H newc -o) | gzip -9 -n > $MKB_FSIMAGE
-size=$(du $MKB_FSIMAGE | awk '{ print $1 }')
-echo_note "WARNING" "Wrote $MKB_FSIMAGE (${size}k compressed)"
+echo_note "WARNING" "[013] Building initrd.img image ...."
 
+cd $MKB_DIR; find . | cpio --quiet -H newc -o | gzip -9 -n > $MKB_FSIMAGE
+cd -
+
+size=$(du $MKB_FSIMAGE | awk '{ print $1 }')
+echo_note "WARNING" "[014] Wrote $MKB_FSIMAGE (${size}k compressed)"
+
+# checking gzip file integrity
 gzip -t $MKB_FSIMAGE
 if [ $? = 1 ]; then 
     echo_note "ERROR" "ERROR CRC initrd" 
@@ -1121,20 +1145,22 @@ if [ $? = 1 ]; then
 fi
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "populate final boot tree ..."
+echo_note "WARNING" "[015] populate final boot tree ..."
 [ ! -d $MKB_BOOTTREE ] && mkdir $MKB_BOOTTREE
+
 cp -a $MKB_SYSLINUX/isolinux  $MKB_BOOTTREE/
-find $MKB_BOOTTREE -name .svn | xargs rm -fr
 
 #cp yocto/bzImage-beetlepos.bin ${MKB_BOOTTREE}/isolinux/vmlinuz
-cp yocto/${BZIMAGE} ${MKB_BOOTTREE}/isolinux/vmlinuz
+cp -v ${TOP_DIR}/yocto/${BZIMAGE} ${MKB_BOOTTREE}/isolinux/vmlinuz
 
 [ ! -d $MKB_BOOTTREE/bsp ] && mkdir $MKB_BOOTTREE/bsp
-#cp yocto/beetlepos-image-beetlepos.tar.gz ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
-cp yocto/${ROOTFS} ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
 
-cp $MKB_FSIMAGE $MKB_BOOTTREE/isolinux/initrd.img
-tree CD
+#cp yocto/beetlepos-image-beetlepos.tar.gz ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
+cp -v ${TOP_DIR}/yocto/${ROOTFS} ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
+
+cp -v $MKB_FSIMAGE $MKB_BOOTTREE/isolinux/initrd.img
+
+tree ${TOP_DIR}/CD
 echo_note "OK" "[OK]"
 
 #

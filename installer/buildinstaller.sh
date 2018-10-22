@@ -79,14 +79,13 @@ done
     echo "ERROR Undefined, _mk-cdrom and _run-install skipped" && \
     exit 1
 
-exit
 #
 # final ISO cd image.
 #
-./_mk-cdrom.sh CD
+./_mk-cdrom.sh ${PWD}/CD
 
 #
 # run qemu installer
 #
-./_run-install.sh 
+# ./_run-install.sh ${PWD}/CD
 

@@ -13,9 +13,9 @@ mkisofs -T -r -b isolinux/isolinux.bin \
         -no-emul-boot \
         -boot-load-size 4 \
         -boot-info-table \
-	-V AmebaSystems-WN-POS-Installer \
-	-o cd.iso \
-	$1
+	    -V Comodoo-POS-Installer \
+	    -o cd.iso \
+	    $1
 
 
 
