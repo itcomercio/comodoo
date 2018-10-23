@@ -182,7 +182,7 @@ makeproductfile() {
     fi
 }
 
-makemainimage () {
+make_main_image () {
     imagename=$1
     type=$2
     mmi_tmpimage=$TMP_DIR/instimage.img.$$
@@ -209,10 +209,10 @@ makemainimage () {
         tune2fs -c0 -i0 $mmi_tmpimage >/dev/null
         mount -o loop $mmi_tmpimage $mmi_mntpoint
 
-        (cd $IMGPATH; find . |
-            fgrep -v "./usr/lib/anaconda-runtime" |
-            fgrep -v "./usr/lib/syslinux"
-            cpio -H crc -o) | (cd $mmi_mntpoint; cpio -iumd)
+        (cd $IMGPATH; find . | \
+                fgrep -v "./usr/lib/anaconda-runtime" | \
+                fgrep -v "./usr/lib/syslinux" cpio -H crc -o) | \
+                (cd $mmi_mntpoint; cpio -iumd)
 
         makeproductfile $mmi_mntpoint
         umount $mmi_mntpoint
@@ -287,9 +287,9 @@ instDir() {
 }
 
 #
-# makeSecondStage: 
+# make_second_stage:
 #
-makeSecondStage() {
+make_second_stage() {
     echo "[stage2]" >> $TOPDESTPATH/.treeinfo
     echo_note "WARNING" "[016] Second stage population python based (stage-2)"
     echo_note "WARNING" "[017] Building install.img"
@@ -640,8 +640,11 @@ ln -sf python2.7 python
 cd -
 
 echo_note "WARNING" "Creating SQUASHFS with install.img"
-makemainimage "install" "squashfs"
+
+make_main_image "install" "squashfs"
+
 echo_note "OK" "[OK]"
+
 [ $? = 0 ] || exit 0
 
 }
@@ -682,7 +685,7 @@ populate_anaconda() {
         ln -sf /dev/null ${fn}c
     done
 
-    makemainimage "install" "squashfs"
+    make_main_image "install" "squashfs"
 
     exit 0
 }
@@ -724,9 +727,7 @@ echo_note "WARNING" "Old temporary files housekepping ..."
 rm -fr ${TMP_DIR}/* 2> /dev/null
 echo_note "OK" "[OK]"
 
-bootstrap
-
-cat ${TMP_DIR}/setup
+bootstrap && cat ${TMP_DIR}/setup
 
 set -x
 exec 5> ${LOGS_DIR}/${BASH_LOG_FILE}
@@ -965,9 +966,9 @@ if [ -z ${ROOTFS} ]; then
     exit 1
 fi
 
-echo ${TOP_DIR}/yoctotmp
-mkdir ${TOP_DIR}/yoctotmp
-mkdir -p ${TOP_DIR}/yoctotmp2/lib
+mkdir ${TOP_DIR}/yoctotmp 2> /dev/null
+mkdir -p ${TOP_DIR}/yoctotmp2/lib 2> /dev/null
+
 echo "uncompressing ${TOP_DIR}/yocto/${ROOTFS}"
 tar xvzf ${TOP_DIR}/yocto/${ROOTFS} -C yoctotmp &>> ${LOGS_DIR}/modules.log
 mv ${TOP_DIR}/yoctotmp/lib/modules yoctotmp2/lib &>> ${LOGS_DIR}/modules.log
@@ -985,8 +986,7 @@ install -m 644 /etc/passwd $MKB_DIR/etc/passwd
 install -m 644 /etc/group $MKB_DIR/etc/group
 install -m 644 /etc/nsswitch.conf $MKB_DIR/etc/nsswitch.conf
 
-# FIXME
-# cp -a /etc/init.d/functions $MKB_DIR/etc/rc.d/init.d
+cp /etc/rc.d/init.d/functions $MKB_DIR/etc/rc.d/init.d
 
 # DHCP and DHCPv6 client daemons and support programs
 cp -a /sbin/dhclient-script $MKB_DIR/sbin/dhclient-script
@@ -1013,14 +1013,14 @@ touch $MKB_DIR/etc/resolv.conf
 #cp -a /etc/dbus-1/system.d/hal.conf $MKB_DIR/etc/dbus-1/system.d
 
 # PolicyKit
-cp -a /etc/polkit-1 $MKB_DIR/etc/
+# cp -a /etc/polkit-1 $MKB_DIR/etc/
 
-( cd /usr/share/dbus-1/system-services
-      cp -a org.freedesktop.PolicyKit1.service $MKB_DIR/usr/share/dbus-1/system-services
-)
-( cd /usr/share/polkit-1/actions/
-      cp -a org.freedesktop.policykit.policy $MKB_DIR/usr/share/PolicyKit/policy
-)
+#( cd /usr/share/dbus-1/system-services
+#      cp -a org.freedesktop.PolicyKit1.service $MKB_DIR/usr/share/dbus-1/system-services
+#)
+#( cd /usr/share/polkit-1/actions/
+#      cp -a org.freedesktop.policykit.policy $MKB_DIR/usr/share/PolicyKit/policy
+#)
 
 # Missing in polkit-1
 #
@@ -1131,34 +1131,28 @@ EOF
 # initrd ready
 echo_note "WARNING" "[013] Building initrd.img image ...."
 
-cd $MKB_DIR; find . | cpio --quiet -H newc -o | gzip -9 -n > $MKB_FSIMAGE
+#cd $MKB_DIR; find . | cpio --quiet -H newc -o | gzip -9 -n > $MKB_FSIMAGE
+cd $MKB_DIR; find . | cpio --quiet -H newc -o > $MKB_FSIMAGE
 cd -
 
 size=$(du $MKB_FSIMAGE | awk '{ print $1 }')
 echo_note "WARNING" "[014] Wrote $MKB_FSIMAGE (${size}k compressed)"
 
 # checking gzip file integrity
-gzip -t $MKB_FSIMAGE
-if [ $? = 1 ]; then 
-    echo_note "ERROR" "ERROR CRC initrd" 
-    exit 1
-fi
+#gzip -t $MKB_FSIMAGE
+#if [ $? = 1 ]; then
+    #echo_note "ERROR" "ERROR CRC initrd"
+    #exit 1
+#fi
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "[015] populate final boot tree ..."
 [ ! -d $MKB_BOOTTREE ] && mkdir $MKB_BOOTTREE
-
 cp -a $MKB_SYSLINUX/isolinux  $MKB_BOOTTREE/
-
-#cp yocto/bzImage-beetlepos.bin ${MKB_BOOTTREE}/isolinux/vmlinuz
-cp -v ${TOP_DIR}/yocto/${BZIMAGE} ${MKB_BOOTTREE}/isolinux/vmlinuz
-
+cp -vf ${TOP_DIR}/yocto/${BZIMAGE} ${MKB_BOOTTREE}/isolinux/vmlinuz
 [ ! -d $MKB_BOOTTREE/bsp ] && mkdir $MKB_BOOTTREE/bsp
-
-#cp yocto/beetlepos-image-beetlepos.tar.gz ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
-cp -v ${TOP_DIR}/yocto/${ROOTFS} ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
-
-cp -v $MKB_FSIMAGE $MKB_BOOTTREE/isolinux/initrd.img
+cp -vf ${TOP_DIR}/yocto/${ROOTFS} ${MKB_BOOTTREE}/bsp/beetlepos-image-beetlepos.bsp
+cp -vf $MKB_FSIMAGE $MKB_BOOTTREE/isolinux/initrd.img
 
 tree ${TOP_DIR}/CD
 echo_note "OK" "[OK]"
@@ -1167,6 +1161,6 @@ echo_note "OK" "[OK]"
 # Second stage population (stage-2):
 #   the real installer, python based (inspired in anaconda installer)
 #
-makeSecondStage
+make_second_stage
 
 
