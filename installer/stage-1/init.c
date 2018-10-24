@@ -1,4 +1,4 @@
-/*
+/* vim:set shiftwidth=4 softtabstop=4 ts=4:
  * init.c: This is the install type init
  *
  * Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
@@ -19,6 +19,8 @@
  *
  * Author(s): Erik Troan (ewt@redhat.com)
  *            Jeremy Katz (katzj@redhat.com)
+ *
+ *
  */
 
 #if USE_MINILIBC
@@ -500,14 +502,21 @@ int main(int argc, char **argv) {
     if (!testing) {
         if (mount("/dev", "/dev", "tmpfs", 0, NULL))
             fatal_error(1);
+
         createDevices();
         printf("done\n");
-	printf("starting udev...");
-	if (fork() == 0) {
-	    execl("/sbin/udevd", "/sbin/udevd","--daemon",NULL);
-	    exit(1);
-	}
+	    printf("starting udev...");
+        /*
+         * systemd-udevd listens to kernel uevents. For every event,
+         * systemd-udevd executes matching instructions specified in udev rules.
+         */
+	    if (fork() == 0) {
+	        execl("/lib/systemd-udevd", "/lib/systemd-udevd",
+	                "--daemon", NULL);
+	        exit(1);
+	    }
     }
+
     printf("done\n");
 
     printf("populating /dev filesystem... "); 
@@ -709,6 +718,11 @@ int main(int argc, char **argv) {
 
     /* D-Bus */
     if (!testing) {
+        /*
+         * The dbus-uuidgen command generates or reads a universally unique ID.
+         * This will ensure that /var/lib/dbus/machine-id exists and has the
+         * uuid in it.
+         */
         if (fork() == 0) {
             execl("/sbin/dbus-uuidgen", "/sbin/dbus-uuidgen", "--ensure", NULL);
 			perror("launching /sbin/dbus-uuidgen");
@@ -737,15 +751,16 @@ int main(int argc, char **argv) {
 
     if (!(installpid = fork())) {
 
-	/* 
+	    /*
+	     * JAVI:
          * comment out this lines for loader
          * debuging, and comment in the following
          * loader line.
          */
-        //printf("running bash for early testing\n");
-        //*argvp++ = "/bin/bash";
+        printf("running bash for early testing\n");
+        *argvp++ = "/bin/bash";
 
-        *argvp++ = "/sbin/loader";
+        //*argvp++ = "/sbin/loader";
 
         if (isSerial == 3) {
             *argvp++ = "--virtpconsole";
@@ -810,4 +825,3 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-/* vim:set shiftwidth=4 softtabstop=4 ts=4: */

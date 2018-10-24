@@ -27,6 +27,7 @@
  *            Michael Fulbright <msf@redhat.com>
  *            Jeremy Katz <katzj@redhat.com>
  */
+ /* vim:set sw=4 sts=4 et: */
 
 #include <ctype.h>
 #include <errno.h>
@@ -1918,17 +1919,22 @@ int main(int argc, char **argv) {
     mlInitModuleConfig();
     earlyModuleLoad(0);
 
-    busProbe(FL_NOPROBE(flags));
+    //busProbe(FL_NOPROBE(flags));
 
-    logMessage(INFO, "ready to run HAL ...");
-    /* HAL daemon */
+    /*
+     * systemd-udevd listens to kernel uevents. For every event,
+     * systemd-udevd executes matching instructions specified in udev rules.
+     *
+    logMessage(INFO, "ready to run UDEVD...");
     if (!FL_TESTING(flags)) {
         if (fork() == 0) {
-            execl("/sbin/hald", "/sbin/hald", "--use-syslog", NULL);
-            perror("running hald ...:");
+            execl("/lib/systemd-udevd",
+                  "/lib/systemd-udevd", "--daemon", NULL);
+            perror("running systemd-udevd...:");
             exit(1);
         }
     }
+    */
 
     logMessage(INFO, "disabling interfaces  ...");
     /* Disable all network interfaces in NetworkManager by default */
@@ -1988,7 +1994,11 @@ int main(int argc, char **argv) {
 
     url = doLoaderMain(&loaderData, modInfo);
 
-    // DEBUG doShell();
+    /*
+     * Javi Debug: unconment for debugging
+     */
+    doShell();
+
 
     if (!FL_TESTING(flags)) {
         int ret;
@@ -2022,7 +2032,10 @@ int main(int argc, char **argv) {
 
     spawnShell();  /* we can attach gdb now :-) */
 
-    // DEBUG doShell();
+    /*
+     * Javi Debug: unconment for debugging
+     */
+    //doShell();
 
     if (FL_NOPROBE(flags) && !loaderData.ksFile) {
         startNewt();
@@ -2091,7 +2104,10 @@ int main(int argc, char **argv) {
 
     logMessage(INFO, "Running anaconda script %s", *(argptr-1));
 
-    // DEBUG doShell();
+    /*
+     * Javi Debug: unconment for debugging
+     */
+    //doShell();
 
     *argptr++ = "--stage2";
     if (strncmp(url, "ftp:", 4)) {
@@ -2256,4 +2272,3 @@ int main(int argc, char **argv) {
     return 1;
 }
 
-/* vim:set sw=4 sts=4 et: */

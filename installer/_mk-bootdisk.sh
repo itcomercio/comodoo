@@ -50,8 +50,8 @@ extract_to_keepfile() {
 # get_dso_deps
 #
 get_dso_deps() {
-    root="$1" ; shift
-    bin="$1" ; shift
+    root="$1"
+    bin="$2"
     DSO_DEPS=""
 
     declare -a FILES
@@ -60,7 +60,7 @@ get_dso_deps() {
     # this is a hack, but the only better way requires binutils or elfutils
     # be installed.  i.e., we need readelf to find the interpretter.
     if [ -z "$LDSO" ]; then
-        for ldso in $root/lib/ld*.so* ; do
+        for ldso in ${root}/lib/ld*.so* ; do
             [ -L $ldso ] && continue
             [ -x $ldso ] || continue
             $ldso --verify $bin >/dev/null 2>&1 || continue
@@ -70,7 +70,6 @@ get_dso_deps() {
 
     [[ "$bin" =~ "grub" ]] && bin="/usr/sbin/grub-probe"
 
-    # I still hate shell.
     declare -i n=0
     while read NAME I0 FILE ADDR I1 ; do
         [ "$FILE" == "not" ] && FILE="$FILE $ADDR"
@@ -78,7 +77,7 @@ get_dso_deps() {
         FILES[$n]="$FILE"
         let n++
     done << EOF
-$(env LD_TRACE_PRELINKING=1 LD_WARN= LD_TRACE_LOADED_OBJECTS=1 $LDSO $bin)
+$(env LD_TRACE_PRELINKING=1 LD_WARN= LD_TRACE_LOADED_OBJECTS=1 $LDSO $root/$bin)
 EOF
 
     [ ${#FILES[*]} -eq 0 ] && return 1
@@ -124,7 +123,7 @@ EOF
        [ "$(readlink -f $l)" == "$LDSO" ] && DSO_DEPS="$DSO_DEPS $l"
     done
 
-    [ -n "$DEBUG" ] && echo "DSO_DEPS for $bin are $DSO_DEPS"
+    [ -n "$DEBUG" ] && echo "DSO_DEPS for $bin are: $DSO_DEPS"
 }
 
 #
@@ -138,13 +137,30 @@ instbin() {
     DIR=$3
     DEST=$4
 
-    install -s -m 755 $ROOT/$BIN $DIR/$DEST
+    echo ROOT=$ROOT
+    echo BIN=$BIN
+    echo DIR=$DIR
+    echo DEST=$DEST
+
+    if [[ -x "$ROOT/$BIN" ]] && file "$ROOT/$BIN" | grep -q "script"
+    then
+        echo "install -m 755 $ROOT/$BIN $DIR/$DEST"
+        install -m 755 $ROOT/$BIN $DIR/$DEST
+    else
+        echo "install -s -m 755 $ROOT/$BIN $DIR/$DEST"
+        install -s -m 755 $ROOT/$BIN $DIR/$DEST
+    fi
+
     # NO STRIP FOR TESTING: install -m 755 $ROOT/$BIN $DIR/$DEST
-    get_dso_deps $ROOT "$BIN"
+
+    echo get_dso_deps $ROOT $BIN
+    get_dso_deps $ROOT $BIN
+
     local DEPS="$DSO_DEPS"
-    mkdir -p $DIR/lib
+    mkdir -pv $DIR/lib
     for x in $DEPS ; do
-        cp -Lfp $ROOT/$x $DIR/lib
+        echo cp -Lfp $x $DIR/lib
+        cp -Lfp $x $DIR/lib
     done
 
     pushd $DIR/lib > /dev/null
@@ -169,7 +185,7 @@ instbin() {
 #
 # makeproductfile:
 #
-makeproductfile() {
+make_product_file() {
     root=$1
 
     echo "making stamp file in $root"
@@ -214,17 +230,17 @@ make_main_image () {
                 fgrep -v "./usr/lib/syslinux" cpio -H crc -o) | \
                 (cd $mmi_mntpoint; cpio -iumd)
 
-        makeproductfile $mmi_mntpoint
+        make_product_file $mmi_mntpoint
         umount $mmi_mntpoint
         rmdir $mmi_mntpoint
     elif [ $type = "squashfs" ]; then
-        makeproductfile $IMGPATH
+        make_product_file $IMGPATH
         echo "Running mksquashfs $IMGPATH $mmi_tmpimage -all-root -no-fragments -no-progress"
         mksquashfs $IMGPATH $mmi_tmpimage -all-root -no-fragments -no-progress 
         chmod 0644 $mmi_tmpimage
         SIZE=$(expr `cat $mmi_tmpimage | wc -c` / 1024)
     elif [ $type = "cramfs" ]; then
-        makeproductfile $IMGPATH
+        make_product_file $IMGPATH
         echo "Running mkcramfs $CRAMBS $IMGPATH $mmi_tmpimage"
         mkfs.cramfs $CRAMBS $IMGPATH $mmi_tmpimage
         SIZE=$(expr `cat $mmi_tmpimage | wc -c` / 1024)
@@ -247,16 +263,22 @@ instFile() {
     FILE=$1
     DESTROOT=$2
 
-    [ -n "$DEBUG" ] && echo "Installing $FILE"
+    #[ -n "$DEBUG" ] && echo "Installing file $FILE"
+    echo "Installing file $FILE"
 
+    # if file exits or is link in destination return
     if [ -e $DESTROOT/$FILE -o -L $DESTROOT/$FILE ]; then
         return
+    # create trailing folder/s
     elif [ ! -d $DESTROOT/`dirname $FILE` ]; then
-        mkdir -p $DESTROOT/`dirname $FILE`
+        mkdir -pv $DESTROOT/`dirname $FILE`
     fi
 
+    # if origin file is a link, copy the linked file
     if [ -L $FILE ]; then
-        cp -al $FILE $DESTROOT/`dirname $FILE`
+        # Create the symlink itself
+        cp -a --preserve=links $FILE $DESTROOT/`dirname $FILE`
+        # copy the target of link
         instFile `dirname $FILE`/`readlink $FILE` $DESTROOT
         return
     else
@@ -279,11 +301,11 @@ instDir() {
     DIR=$1
     DESTROOT=$2
 
-    [ -n "$DEBUG" ] && echo "Installing $DIR"
+    echo "Installing folder $DIR recursively"
     if [ -d $DESTROOT/$DIR -o -h $DESTROOT/$DIR ]; then
       return
     fi
-    cp -a --parents $DIR $DESTROOT/
+    cp -av --parents $DIR $DESTROOT/
 }
 
 #
@@ -517,7 +539,7 @@ INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
-ps gdb netstat test less"
+ps gdb netstat test less ss /usr/bin/coreutils"
 
 # TODO: nash missing
 # TODO: grub missing
@@ -690,7 +712,7 @@ populate_anaconda() {
     exit 0
 }
 
-bootstrap() {
+main() {
     [[ -d $TMP_DIR ]] || mkdir $TMP_DIR
     [[ -d $LOGS_DIR ]] || mkdir $LOGS_DIR
     [[ -d $STAGING_DIR ]] || mkdir $STAGING_DIR
@@ -727,7 +749,7 @@ echo_note "WARNING" "Old temporary files housekepping ..."
 rm -fr ${TMP_DIR}/* 2> /dev/null
 echo_note "OK" "[OK]"
 
-bootstrap && cat ${TMP_DIR}/setup
+main && cat ${TMP_DIR}/setup
 
 set -x
 exec 5> ${LOGS_DIR}/${BASH_LOG_FILE}
@@ -752,10 +774,10 @@ mkdir -p ${MKB_DIR}/lib/udev/rules.d
 mkdir -p ${MKB_DIR}/etc/modprobe.d
 mkdir -p ${MKB_DIR}/etc/terminfo/{a,b,d,l,s,v,x}
 mkdir -p ${MKB_DIR}/etc/sysconfig/network-scripts
-mkdir -p ${MKB_DIR}/usr/libexec
+mkdir -p ${MKB_DIR}/usr/libexec/dbus-1
 mkdir -p ${MKB_DIR}/usr/sbin
 mkdir -p ${MKB_DIR}/usr/bin
-mkdir -p ${MKB_DIR}/usr/lib
+mkdir -p ${MKB_DIR}/usr/lib/systemd
 mkdir -p ${MKB_DIR}/proc
 mkdir -p ${MKB_DIR}/selinux
 mkdir -p ${MKB_DIR}/sys
@@ -778,6 +800,8 @@ mkdir -p ${MKB_DIR}/etc/hal/fdi
 mkdir -p ${MKB_DIR}/usr/share/hal/fdi
 mkdir -p ${MKB_DIR}/usr/share/hwdata
 mkdir -p ${MKB_DIR}/var/cache/hald
+mkdir -p ${MKB_DIR}/run/dbus
+mkdir -p ${MKB_DIR}/run/udev
 echo_note "OK" "[OK]"
 
 #
@@ -791,8 +815,7 @@ cp syslinux/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
 echo_note "OK" "[OK]"
 
 #
-# First stage population (stage-1):
-#   own "init" process and "loader" of second stage.
+# Builds "isys" installer utility functions
 #
 echo_note "WARNING" "[003] isys building ...."
 echo "############### isys #########" >> ${LOGS_DIR}/build.log
@@ -803,6 +826,9 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
+#
+# Builds "isomd5sum" Utilities for working with md5sum implanted in ISO images
+#
 echo_note "WARNING" "[004] isomd5sum building ...."
 echo "############### isomd5sum #########"  >> ${LOGS_DIR}/build.log
 make -C isomd5sum &>> ${LOGS_DIR}/build.log
@@ -812,6 +838,9 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
+#
+# Build "init" and "loader" stage-1 installer
+#
 echo_note "WARNING" "[005] stage-1 building...."
 echo "############### stage-1 #########" >> ${LOGS_DIR}/build.log
 make -C stage-1 &>> ${LOGS_DIR}/build.log
@@ -821,6 +850,9 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
+#
+# Build "pyblock" python bindings for device-mapper functionalities
+#
 echo_note "WARNING" "[006] pyblock building...."
 echo "############### stage-1 #########" >> ${LOGS_DIR}/build.log
 make -C pyblock &>> ${LOGS_DIR}/build.log
@@ -830,22 +862,34 @@ else
     echo_note "ERROR" "[ERROR]"
 fi
 
+#
+# Populate custom "init" process
+#
 echo_note "WARNING" "[007] Install init in ${MKB_DIR}/sbin/init"
 instbin ${PWD}/stage-1 init \
     ${MKB_DIR} /sbin/init &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "[008] Install init in ${MKB_DIR}/sbin/loader"
+#
+# Populate "loader" custom installer process
+#
+echo_note "WARNING" "[008] Install loader in ${MKB_DIR}/sbin/loader"
 instbin ${PWD}/stage-1 loader \
     ${MKB_DIR} /sbin/loader &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
+#
+# hatl, reboot and poweroff set to custom "init"
+#
 cd ${MKB_DIR}/sbin
 ln -s ./init  ${MKB_DIR}/sbin/reboot
 ln -s ./init  ${MKB_DIR}/sbin/halt
 ln -s ./init  ${MKB_DIR}/sbin/poweroff
 cd ${TOP_DIR}
 
+#
+# Populate "pyblock" to second stage folders (used by anaconda)
+#
 cp pyblock/dmmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmmodule.so
 cp pyblock/dmraidmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmraidmodule.so
 
@@ -855,7 +899,7 @@ INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
-ps gdb netstat test less"
+ps gdb netstat test less id systemctl"
 
 # TODO: nash missing
 # TODO: grub missing
@@ -865,27 +909,39 @@ modprobe parted partprobe pidof reboot sfdisk shutdown ip \
 udevadm consoletype logger"
 
 echo_note "WARNING" "[009] $MKB_DIR population ..."
+#
+# check utilities availability, abort is FAILS
+#
 for i in $INSTALL_BIN; do
         type $i &> /dev/null
         [ $? != 0 ] && echo "ERROR $i not in path" && exit
 done
-
 for i in $INSTALL_BIN; do
     instbin / `which $i` $MKB_DIR /bin/$i &>> ${LOGS_DIR}/init-loader.log
 done
 
+#
+# check utilities availability, abort is FAILS
+#
 for i in $INSTALL_SBIN; do
         type $i &> /dev/null
         [ $? != 0 ] && echo "ERROR $i not in path" && exit
 done
-
 for i in $INSTALL_SBIN; do
     instbin / `which $i` $MKB_DIR /sbin/$i &>> ${LOGS_DIR}/initrd-population.log
 done
 
-instbin / `which python` $MKB_DIR /usr/bin/python &>> ${LOGS_DIR}/initrd-population.log
-instbin / `which load_policy` $MKB_DIR /usr/sbin/load_policy &>> ${LOGS_DIR}/initrd-population.log
+instbin / `which python` $MKB_DIR /usr/bin/python \
+    &>> ${LOGS_DIR}/initrd-population.log
+instbin / `which load_policy` $MKB_DIR /usr/sbin/load_policy \
+    &>> ${LOGS_DIR}/initrd-population.log
+instbin /usr/lib/systemd systemd-udevd $MKB_DIR /usr/lib/systemd/systemd-udev \
+    &>> ${LOGS_DIR}/initrd-population.log
+instbin / /usr/bin/coreutils $MKB_DIR /usr/bin/coreutils \
+    &>> ${LOGS_DIR}/initrd-population.log
 
+# NSS files for dbus-daemon
+cp /lib64/libnss* ${MKB_DIR}/lib
 
 KEEPFILERD=${TMP_DIR:-tmp}/keepfilerd.$$
 
@@ -931,17 +987,16 @@ done
 instbin / `which dbus-uuidgen` $MKB_DIR /sbin/dbus-uuidgen &>> ${LOGS_DIR}/initrd-population.log
 instbin / `which dbus-daemon` $MKB_DIR /sbin/dbus-daemon &>> ${LOGS_DIR}/initrd-population.log
 
-cp -a  /etc/dbus-1/system.conf $MKB_DIR/etc/dbus-1/system.conf
-cp -a  /etc/dbus-1/session.conf $MKB_DIR/etc/dbus-1/session.conf
+cp -a /etc/dbus-1/system.conf $MKB_DIR/etc/dbus-1/system.conf
+cp -a /usr/share/dbus-1/system.conf $MKB_DIR/usr/share/dbus-1/system.conf
+cp -a /etc/dbus-1/session.conf $MKB_DIR/etc/dbus-1/session.conf
 cp -a -f /etc/dbus-1 $MKB_DIR/etc/
 
-#sudo cp -v -a /usr/lib/dbus-1.0/dbus-daemon-launch-helper $MKB_DIR/lib/dbus-1
-# cp -a /usr/lib/dbus-1.0/dbus-daemon-launch-helper $MKB_DIR/lib/dbus-1
-# sudo chown root:dbus $MKB_DIR/lib/dbus-1/dbus-daemon-launch-helper
-#sudo chown root: $MKB_DIR/lib/dbus-1/dbus-daemon-launch-helper
-#sudo chmod 04750 $MKB_DIR/lib/dbus-1/dbus-daemon-launch-helper
-#rm -f $MKB_DIR/lib/udev/rules.d/*persistent*
-#rm -f $MKB_DIR/lib/udev/rules.d/*generator*
+cp -v -a /usr/libexec/dbus-1/dbus-daemon-launch-helper \
+    $MKB_DIR/usr/libexec/dbus-1/dbus-daemon-launch-helper
+
+chown root:dbus $MKB_DIR/usr/libexec/dbus-1/dbus-daemon-launch-helper
+chmod 04750 $MKB_DIR/usr/libexec/dbus-1/dbus-daemon-launch-helper
 
 # i18n from anaconda
 KEYMAPS=addons/keymaps-override-x86_64
@@ -978,7 +1033,7 @@ tar cvzf ../${MODULES} lib &>> ${LOGS_DIR}/modules.log
 cd ../..
 rm -fr yoctotmp
 rm -fr yoctotmp2
-tar xzf yocto/${MODULES} -C $MKB_DIR &>> ${LOGS_DIR}/modules.log
+tar xzf ${TOP_DIR}/yocto/${MODULES} -C $MKB_DIR &>> ${LOGS_DIR}/modules.log
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "[011] tricky stuff population for initrd image ..."
@@ -1076,7 +1131,7 @@ install -m 755 /lib/x86_64-linux-gnu/libnss_files.so.2 $MKB_DIR/lib/
 #install -m 755 /lib/libgcc_s.so.1 $MKB_DIR/lib/
 install -m 755 /lib/x86_64-linux-gnu/libgcc_s.so.1 $MKB_DIR/lib/
 
-makeproductfile $MKB_DIR
+make_product_file $MKB_DIR
 
 echo_note "WARNING" "Creating important symlinks"
 
