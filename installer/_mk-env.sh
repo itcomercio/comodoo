@@ -44,7 +44,8 @@ e2fsprogs \
 policycoreutils \
 genisoimage \
 python2-dbus \
-python2-pyparted
+python2-pyparted \
+udisks2
 
 echo_note "OK" "Packages installed!"
 
