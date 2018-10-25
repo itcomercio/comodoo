@@ -1921,21 +1921,6 @@ int main(int argc, char **argv) {
 
     //busProbe(FL_NOPROBE(flags));
 
-    /*
-     * systemd-udevd listens to kernel uevents. For every event,
-     * systemd-udevd executes matching instructions specified in udev rules.
-     *
-    logMessage(INFO, "ready to run UDEVD...");
-    if (!FL_TESTING(flags)) {
-        if (fork() == 0) {
-            execl("/lib/systemd-udevd",
-                  "/lib/systemd-udevd", "--daemon", NULL);
-            perror("running systemd-udevd...:");
-            exit(1);
-        }
-    }
-    */
-
     logMessage(INFO, "disabling interfaces  ...");
     /* Disable all network interfaces in NetworkManager by default */
     if ((i = writeDisabledNetInfo()) != 0) {
@@ -1997,7 +1982,7 @@ int main(int argc, char **argv) {
     /*
      * Javi Debug: unconment for debugging
      */
-    doShell();
+    //doShell();
 
 
     if (!FL_TESTING(flags)) {
@@ -2055,11 +2040,11 @@ int main(int argc, char **argv) {
     add_fw_search_dir(&loaderData, "/tmp/updates/firmware");
     add_fw_search_dir(&loaderData, "/tmp/product/firmware");
 
+    add_to_path_env("PYTHONPATH", "/usr/lib/anaconda");
     add_to_path_env("PYTHONPATH", "/tmp/updates");
     add_to_path_env("PYTHONPATH", "/tmp/updates/iw");
     add_to_path_env("PYTHONPATH", "/tmp/updates/textw");
     add_to_path_env("PYTHONPATH", "/tmp/product");
-    add_to_path_env("PYTHONPATH", "/usr/lib/anaconda");
     add_to_path_env("LD_LIBRARY_PATH", "/tmp/updates");
     add_to_path_env("LD_LIBRARY_PATH", "/tmp/product");
     add_to_path_env("PATH", "/tmp/updates");

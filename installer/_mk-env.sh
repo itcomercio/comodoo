@@ -42,7 +42,9 @@ python2-dialog \
 dhcp-client \
 e2fsprogs \
 policycoreutils \
-genisoimage
+genisoimage \
+python2-dbus \
+python2-pyparted
 
 echo_note "OK" "Packages installed!"
 

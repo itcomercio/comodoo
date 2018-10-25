@@ -498,9 +498,13 @@ int main(int argc, char **argv) {
     }
     printf("done\n");
 
+    /*
+     * Mounting /dev filesystem and device populating with
+     * udevd.
+     */
     printf("creating /dev filesystem... "); 
     if (!testing) {
-        if (mount("/dev", "/dev", "tmpfs", 0, NULL))
+        if (mount("none", "/dev", "devtmpfs", 0, NULL))
             fatal_error(1);
 
         createDevices();

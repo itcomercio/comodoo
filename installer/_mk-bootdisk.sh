@@ -43,7 +43,7 @@ extract_to_keepfile() {
             echo $i
         fi
     done
-    rm -f tmp/in-keep.tmp 2> /dev/null
+    #rm -f tmp/in-keep.tmp 2> /dev/null
 }
 
 #
@@ -220,18 +220,27 @@ make_main_image () {
             SIZE=$(expr $SIZE - $ERROR)
         fi
 
+        echo "create room with /dev/zero, size: $SIZE"
         dd if=/dev/zero bs=1k count=${SIZE} of=$mmi_tmpimage 2>/dev/null
-        mke2fs -q -F $mmi_tmpimage > /dev/null 
+        echo "create ext2 filesystem at $mmi_tmpimage"
+        mke2fs -q -F $mmi_tmpimage > /dev/null
+        echo "tune ext2 filesystem at $mmi_tmpimage"
         tune2fs -c0 -i0 $mmi_tmpimage >/dev/null
-        mount -o loop $mmi_tmpimage $mmi_mntpoint
 
-        (cd $IMGPATH; find . | \
-                fgrep -v "./usr/lib/anaconda-runtime" | \
-                fgrep -v "./usr/lib/syslinux" cpio -H crc -o) | \
-                (cd $mmi_mntpoint; cpio -iumd)
+        echo "mount loopback $mmi_tmpimage at $mmi_mntpoint"
+        #mount -o loop $mmi_tmpimage $mmi_mntpoint
+        mknod -m 0660 /dev/loop2 b 7 2
+        chown root:disk /dev/loop2
+        losetup /dev/loop2 $mmi_tmpimage
+        mount /dev/loop2 $mmi_mntpoint
+
+        echo "cd $IMGPATH and grep files"
+        cd $IMGPATH; find . | cpio -H crc -o | (cd $mmi_mntpoint; cpio -iumd)
+        cd -
 
         make_product_file $mmi_mntpoint
         umount $mmi_mntpoint
+        losetup -d /dev/loop2
         rmdir $mmi_mntpoint
     elif [ $type = "squashfs" ]; then
         make_product_file $IMGPATH
@@ -309,7 +318,8 @@ instDir() {
 }
 
 #
-# make_second_stage:
+# make_second_stage: this is the population of install.img used in the
+# installation process based on anaconda python installer.
 #
 make_second_stage() {
     echo "[stage2]" >> $TOPDESTPATH/.treeinfo
@@ -424,6 +434,7 @@ cat > $KEEPFILE <<EOF
 /usr/bin/reduce-font
 /usr/bin/tac
 /usr/bin/tail
+/usr/bin/coreutils
 /sbin/udevadm
 /usr/bin/uniq
 /usr/lib/yaboot
@@ -513,20 +524,30 @@ cat > $KEEPFILE <<EOF
 EOF
 
 # For further population of Python dependecies.
-extract_to_keepfile python >> $KEEPFILE
-extract_to_keepfile python2.7 >> $KEEPFILE
-extract_to_keepfile python2.7-minimal >> $KEEPFILE
-extract_to_keepfile python-newt >> $KEEPFILE
-extract_to_keepfile python-dbus >> $KEEPFILE
+extract_to_keepfile python2 >> $KEEPFILE
+extract_to_keepfile python2-libs >> $KEEPFILE
+extract_to_keepfile python2-dialog >> $KEEPFILE
 extract_to_keepfile python-parted >> $KEEPFILE
 extract_to_keepfile libaudit0 >> $KEEPFILE
 extract_to_keepfile vim-tiny >> $KEEPFILE
 extract_to_keepfile kbd >> $KEEPFILE
-extract_to_keepfile hal >> $KEEPFILE
 extract_to_keepfile passwd >> $KEEPFILE
-extract_to_keepfile libc >> $KEEPFILE
-extract_to_keepfile libc-bin >> $KEEPFILE
-extract_to_keepfile libc6 >> $KEEPFILE
+extract_to_keepfile glibc-minimal-langpack >> $KEEPFILE
+extract_to_keepfile glibc >> $KEEPFILE
+extract_to_keepfile glibc-langpack-en >> $KEEPFILE
+extract_to_keepfile glibc-common >> $KEEPFILE
+extract_to_keepfile glibc-headers >> $KEEPFILE
+extract_to_keepfile libX11 >> $KEEPFILE
+extract_to_keepfile libnl3 >> $KEEPFILE
+extract_to_keepfile libxcb >> $KEEPFILE
+extract_to_keepfile libXau >> $KEEPFILE
+extract_to_keepfile dmraid >> $KEEPFILE
+extract_to_keepfile e2fsprogs >> $KEEPFILE
+extract_to_keepfile python2-dbus >> $KEEPFILE
+extract_to_keepfile python2-pyparted >> $KEEPFILE
+extract_to_keepfile dialog >> $KEEPFILE
+extract_to_keepfile ncurses-base >> $KEEPFILE
+extract_to_keepfile vim-minimal >> $KEEPFILE
 
 rm -fr ${TOP_DIR}/tmp/dir
 PKGDEST=${TOP_DIR}/tmp/dir
@@ -539,7 +560,7 @@ INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
-ps gdb netstat test less ss /usr/bin/coreutils"
+ps gdb netstat test less ss coreutils"
 
 # TODO: nash missing
 # TODO: grub missing
@@ -548,11 +569,25 @@ insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
 modprobe parted partprobe pidof reboot sfdisk shutdown ip \
 udevadm consoletype logger"
 
+#
+# check utilities availability, abort is FAILS
+#
+for i in $INSTALL_BIN; do
+        type $i &> /dev/null
+        [ $? != 0 ] && echo "ERROR $i not in path" && exit
+done
 for i in $INSTALL_BIN
 do
     instbin / `which $i` $PKGDEST /bin/$i &>> ${LOGS_DIR}/second-stage.log
 done
 
+#
+# check utilities availability, abort is FAILS
+#
+for i in $INSTALL_SBIN; do
+        type $i &> /dev/null
+        [ $? != 0 ] && echo "ERROR $i not in path" && exit
+done
 for i in $INSTALL_SBIN
 do
     instbin / `which $i` $PKGDEST /sbin/$i &>> ${LOGS_DIR}/second-stage.log
@@ -579,12 +614,15 @@ done
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "copy anaconda installer to $PKGDEST/usr/bin/"
-cp ${TOP_DIR}/stage-2/anaconda $PKGDEST/usr/bin/
-cp ${TOP_DIR}/isys/_isys.so stage-2/usr/lib/anaconda/
+cp -v ${TOP_DIR}/stage-2/anaconda $PKGDEST/usr/bin/
+# moved usr/lib/anaconda further
+cp -v ${TOP_DIR}/isys/_isys.so ${TOP_DIR}/stage-2/usr/lib/anaconda/
+
 mv $PKGDEST/bin/* $PKGDEST/usr/bin
 echo_note "OK" "[OK]"
 
-rm -fr $PKGDEST/lib64 
+cp -f $PKGDEST/lib64/* $PKGDEST/lib/ 2> /dev/null
+rm -fr $PKGDEST/lib64
 
 pushd $PKGDEST
 ln -s lib lib64
@@ -604,6 +642,7 @@ pushd $PKGDEST/lib
 ln -s libdevmapper.so.1.02.1 libdevmapper.so.1.02
 popd
 
+# Real copy of anaconda install framework
 pushd ${TOP_DIR}/stage-2
 cp -a usr/ $PKGDEST
 popd
@@ -626,7 +665,7 @@ EOF
 chmod 755 $PKGDEST/usr/bin/grub-install
 echo_note "OK" "[OK]"
 
-rm -rf $PKGDEST/boot $PKGDEST/home $PKGDEST/root $PKGDESTtmp
+rm -rf $PKGDEST/boot $PKGDEST/home $PKGDEST/root $PKGDEST/tmp
 
 find $PKGDEST -name "*.a" | grep -v kernel-wrapper/wrapper.a | xargs rm -rf
 find $PKGDEST -name "lib*.la" |grep -v "usr/$LIBDIR/gtk-2.0" | xargs rm -rf
@@ -640,7 +679,6 @@ mkdir -p $PKGDEST/usr/lib/debug
 mkdir -p $PKGDEST/usr/src/debug
 
 find $PKGDEST -name "*.py" | while read fn; do
-    rm -f ${fn}o
     rm -f ${fn}c
     ln -sf /dev/null ${fn}c
 done
@@ -661,9 +699,10 @@ cd $PKGDEST/usr/bin
 ln -sf python2.7 python
 cd -
 
-echo_note "WARNING" "Creating SQUASHFS with install.img"
+echo_note "WARNING" "Creating selected filesystem with install.img"
 
-make_main_image "install" "squashfs"
+make_main_image "install" "ext2"
+#make_main_image "install" "squashfs"
 
 echo_note "OK" "[OK]"
 
@@ -890,8 +929,10 @@ cd ${TOP_DIR}
 #
 # Populate "pyblock" to second stage folders (used by anaconda)
 #
-cp pyblock/dmmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmmodule.so
-cp pyblock/dmraidmodule.so.0.48 stage-2/usr/lib/anaconda/block/dmraidmodule.so
+cp ${TOP_DIR}/pyblock/dmmodule.so.0.48 \
+    ${TOP_DIR}/stage-2/usr/lib/anaconda/block/dmmodule.so
+cp ${TOP_DIR}/pyblock/dmraidmodule.so.0.48 \
+    ${TOP_DIR}/stage-2/usr/lib/anaconda/block/dmraidmodule.so
 
 # core linux utils population
 # TODO: nash missing
@@ -945,7 +986,6 @@ cp /lib64/libnss* ${MKB_DIR}/lib
 
 KEEPFILERD=${TMP_DIR:-tmp}/keepfilerd.$$
 
-extract_to_keepfile hal >> $KEEPFILERD
 extract_to_keepfile passwd >> $KEEPFILERD
 extract_to_keepfile libc >> $KEEPFILERD
 extract_to_keepfile libc-bin >> $KEEPFILERD
