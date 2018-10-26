@@ -548,6 +548,7 @@ extract_to_keepfile python2-pyparted >> $KEEPFILE
 extract_to_keepfile dialog >> $KEEPFILE
 extract_to_keepfile ncurses-base >> $KEEPFILE
 extract_to_keepfile vim-minimal >> $KEEPFILE
+extract_to_keepfile udisks2 >> $KEEPFILE
 
 rm -fr ${TOP_DIR}/tmp/dir
 PKGDEST=${TOP_DIR}/tmp/dir
@@ -979,6 +980,8 @@ instbin / `which load_policy` $MKB_DIR /usr/sbin/load_policy \
 instbin /usr/lib/systemd systemd-udevd $MKB_DIR /usr/lib/systemd/systemd-udev \
     &>> ${LOGS_DIR}/initrd-population.log
 instbin / /usr/bin/coreutils $MKB_DIR /usr/bin/coreutils \
+    &>> ${LOGS_DIR}/initrd-population.log
+instbin / /usr/libexec/udisks2/udisksd $MKB_DIR /usr/libexec/udisks2/udisksd \
     &>> ${LOGS_DIR}/initrd-population.log
 
 # NSS files for dbus-daemon

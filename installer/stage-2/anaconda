@@ -15,7 +15,7 @@ import product
 import iutil
 import isys
 import parted
-import minihal
+import udisks2
 
 
 from constants import *
@@ -24,9 +24,6 @@ __version__ = "0.0.1"
 
 # import gettext
 # _ = lambda x: gettext.ldgettext("anaconda", x)
-
-
-log = None
 
 fstype2tool = {"ext3": ("mkfs.ext3", "-v"), "swap": ("mkswap", "-V1")}
 
@@ -187,37 +184,21 @@ def exec_with_pulse_progress(command, argv, stdin=0, stdout=1, stderr=2,
 class DiskSet:
     """The disks in the system."""
 
-    def __init__(self):
+    def __init__(self, log):
         self.deviceFile = None
+        self.log = log
 
     def drive_list(self):
-        for dev in minihal.get_devices_by_type("storage"):
-            if dev['device'] is None:
-                continue
+        dev = udisks2.get_devices_by_type("storage")
+        if "/dev/sda" in dev:
+            self.deviceFile = "/dev/sda"
+        else:
+            self.deviceFile = "/dev/hda"
 
-            device = dev['device'].replace('/dev/', '')
-
-            log.info("detected possible disk: %s" % (device,))
-            log.info("device type: %s" % (dev['storage.drive_type'],))
-
-            if device.startswith("sg"):
-                log.info("ignoring st device %s" % (device,))
-                continue
-
-            if device.startswith("md"):
-                log.info("ignoring sr device %s" % (device,))
-                continue
-
-            if device.startswith("sr"):
-                log.info("ignoring sr device %s" % (device,))
-                continue
-
-            if dev['storage.drive_type'] == 'disk':
-                self.deviceFile = dev['device']
-                log.info("final disk selected: %s" % (self.deviceFile,))
+        self.log.info("detected possible disk: %s" % self.deviceFile)
 
         if not self.deviceFile:
-            log.warning("no detected possible disks: %s" % (device,))
+            self.log.warning("no detected possible disks")
 
         return self.deviceFile
 
@@ -424,7 +405,8 @@ class BspImage:
 
 
 class Installer:
-    def __init__(self, opt):
+    def __init__(self, log, opt):
+        self.log = log
         self.options = opt
         self.targetdisk = None
         self.screen = dialog.Dialog(dialog="dialog")
@@ -451,7 +433,7 @@ class Installer:
         if self.options.devel:
             self.targetdisk = "/dev/sda"
         else:
-            ds = DiskSet()
+            ds = DiskSet(self.log)
             self.targetdisk = ds.drive_list()
 
         self.screen.pause(MSG_DISK_SET % self.targetdisk, None, None, 2)
@@ -589,7 +571,7 @@ def main():
 
     log.info("Installer runnting, good luck!")
 
-    installer = Installer(options)
+    installer = Installer(log, options)
 
     return 0
 
