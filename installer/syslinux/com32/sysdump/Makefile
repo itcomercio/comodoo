@@ -15,24 +15,26 @@
 ## Simple menu system
 ##
 
-topdir = ../..
-include ../MCONFIG
+VPATH = $(SRC)
+include $(MAKEDIR)/elf.mk
 -include $(topdir)/version.mk
 
-LIBS	   = ../libutil/libutil_com.a ../lib/libcom32.a $(LIBGCC)
-LNXLIBS	   = ../libutil/libutil_lnx.a
+LIBS	   = $(objdir)/com32/libupload/libcom32upload.a
+LNXLIBS	   = $(objdir)/com32/libutil/libutil_lnx.a
+
+CFLAGS += -I$(com32) -I$(topdir)
 
 MODULES	  = sysdump.c32
 TESTFILES =
 
-SRCS = $(wildcard *.c)
-OBJS = $(patsubst %.c,%.o,$(SRCS))
+SRCS = $(sort $(wildcard $(SRC)/*.c))
+OBJS = $(subst $(SRC)/,,$(patsubst %.c,%.o,$(SRCS)))
 
 # The DATE is set on the make command line when building binaries for
 # official release.  Otherwise, substitute a hex string that is pretty much
 # guaranteed to be unique to be unique from build to build.
 ifndef HEXDATE
-HEXDATE := $(shell $(PERL) $(topdir)/now.pl $(SRCS) $(wildcard *.h))
+HEXDATE := $(shell $(PERL) $(topdir)/now.pl $(SRCS) $(sort $(wildcard *.h)))
 endif
 ifndef DATE
 DATE    := $(shell sh $(topdir)/gen-id.sh $(VERSION) $(HEXDATE))
@@ -46,7 +48,7 @@ sysdump.elf : $(OBJS) $(LIBS) $(C_LIBS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
 tidy dist:
-	rm -f *.o *.lo *.a *.lst *.elf .*.d *.tmp
+	rm -f *.o *.lo *.a *.lst .*.d *.tmp
 
 clean: tidy
 	rm -f *.lnx

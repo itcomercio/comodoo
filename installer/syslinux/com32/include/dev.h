@@ -36,11 +36,13 @@
 
 #include <klibc/extern.h>
 #include <stdint.h>
+#include <stddef.h>
 
 struct input_dev;
 struct output_dev;
 
 __extern int opendev(const struct input_dev *, const struct output_dev *, int);
+__extern int openmem(const void *, size_t, int);
 
 /* Common generic devices */
 

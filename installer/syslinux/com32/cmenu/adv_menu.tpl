@@ -34,7 +34,7 @@ modify this template to suit your needs
 #define NULL ((void *) 0)
 #endif
 
-#include "menu.h"
+#include "cmenu.h"
 #include "help.h"
 #include "passwords.h"
 #include "com32io.h"
@@ -221,13 +221,15 @@ void keys_handler(t_menusystem * ms __attribute__ (( unused )), t_menuitem * mi,
    }
 }
 
-t_handler_return login_handler(t_menuitem *mi)
+t_handler_return login_handler(t_menusystem *ms, t_menuitem *mi)
 {
   (void)mi; // Unused
   char pwd[40];
   char login[40];
   int nc, nr;
   t_handler_return rv;
+
+  (void)ms;
 
   rv = ACTION_INVALID;
   if (PWD_ROW < 0) return rv; // No need to authenticate
@@ -310,7 +312,7 @@ void runcommand(pt_menuitem mi)
    x = (pt_xtra) mi->extra_data;
    ipappend = (x ? x->ipappend : 0);
 
-   runsyslinuximage(line,x->ipappend);
+   runsyslinuximage(line,ipappend);
    free(line);
 }
 

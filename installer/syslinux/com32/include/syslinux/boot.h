@@ -37,10 +37,10 @@
 #include <stdint.h>
 #include <klibc/compiler.h>
 
-__noreturn syslinux_run_command(const char *);
+int syslinux_run_command(const char *);
 __noreturn syslinux_run_default(void);
 
-void syslinux_local_boot(uint16_t flags);
+void syslinux_local_boot(int16_t flags);
 
 void syslinux_final_cleanup(uint16_t flags);
 
@@ -48,15 +48,27 @@ void syslinux_chain_bootstrap(uint16_t flags, const void *bootstrap,
 			      uint32_t bootstrap_len, uint32_t edx,
 			      uint32_t esi, uint16_t ds);
 
+void bios_do_shuffle_and_boot(uint16_t bootflags, uint32_t descaddr,
+			      const void *descbuf, uint32_t dsize);
+
+struct image_types {
+    const char *name;
+    uint32_t type;
+};
+
+extern const struct image_types image_boot_types[];
+
 #define IMAGE_TYPE_KERNEL	0
 #define IMAGE_TYPE_LINUX	1
 #define IMAGE_TYPE_BOOT		2
 #define IMAGE_TYPE_BSS		3
 #define IMAGE_TYPE_PXE		4
 #define IMAGE_TYPE_FDIMAGE	5
-#define IMAGE_TYPE_COMBOOT	6
 #define IMAGE_TYPE_COM32	7
 #define IMAGE_TYPE_CONFIG	8
+#define IMAGE_TYPE_LOCALBOOT	9
+
+uint32_t parse_image_type(const char *cmdline);
 void syslinux_run_kernel_image(const char *filename, const char *cmdline,
 			       uint32_t ipappend_flags, uint32_t type);
 

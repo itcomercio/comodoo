@@ -44,6 +44,7 @@
 #include <sys/stat.h>
 #include <elf.h>
 #include <console.h>
+#include <dprintf.h>
 
 #include <syslinux/loadfile.h>
 #include <syslinux/movebits.h>
@@ -51,13 +52,6 @@
 
 /* If we don't have this much memory for the stack, signal failure */
 #define MIN_STACK	512
-
-#define DEBUG 0
-#if DEBUG
-# define dprintf printf
-#else
-# define dprintf(f, ...) ((void)0)
-#endif
 
 static inline void error(const char *msg)
 {
@@ -87,15 +81,13 @@ int boot_raw(void *ptr, size_t len, addr_t where, char **argv)
     if (!mmap || !amap)
 	goto bail;
 
-#if DEBUG
     dprintf("Initial memory map:\n");
-    syslinux_dump_memmap(stdout, mmap);
-#endif
+    syslinux_dump_memmap(mmap);
 
-    dprintf("Segment at 0x%08x len 0x%08x\n", where, len);
+    dprintf("Segment at 0x%08x len 0x%08zx\n", where, len);
 
     if (syslinux_memmap_type(amap, where, len) != SMT_FREE) {
-	printf("Memory segment at 0x%08x (len 0x%08x) is unavailable\n",
+	printf("Memory segment at 0x%08x (len 0x%08zx) is unavailable\n",
 	       where, len);
 	goto bail;		/* Memory region unavailable */
     }
@@ -125,10 +117,8 @@ int boot_raw(void *ptr, size_t len, addr_t where, char **argv)
     if (!stack_frame)
 	goto bail;
 
-#if DEBUG
     dprintf("Right before syslinux_memmap_largest()...\n");
-    syslinux_dump_memmap(stdout, amap);
-#endif
+    syslinux_dump_memmap(amap);
 
     if (syslinux_memmap_largest(amap, SMT_FREE, &lstart, &llen))
 	goto bail;		/* NO free memory?! */
@@ -179,16 +169,14 @@ int boot_raw(void *ptr, size_t len, addr_t where, char **argv)
     regs.eip = where;
     regs.esp = stack_pointer;
 
-#if DEBUG
     dprintf("Final memory map:\n");
-    syslinux_dump_memmap(stdout, mmap);
+    syslinux_dump_memmap(mmap);
 
     dprintf("Final available map:\n");
-    syslinux_dump_memmap(stdout, amap);
+    syslinux_dump_memmap(amap);
 
     dprintf("Movelist:\n");
-    syslinux_dump_movelist(stdout, ml);
-#endif
+    syslinux_dump_movelist(ml);
 
     /* This should not return... */
     fputs("Booting...\n", stdout);
@@ -209,8 +197,6 @@ int main(int argc, char *argv[])
     void *data;
     size_t data_len;
     addr_t where;
-
-    openconsole(&dev_null_r, &dev_stdcon_w);
 
     if (argc < 3) {
 	error("Usage: pmload.c32 bin_file address arguments...\n");

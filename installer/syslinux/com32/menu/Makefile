@@ -14,24 +14,23 @@
 ## Simple menu system
 ##
 
-topdir = ../..
-include ../MCONFIG
+VPATH = $(SRC)
+include $(MAKEDIR)/elf.mk
 
-LIBS	   = ../libutil/libutil_com.a ../lib/libcom32.a $(LIBGCC)
-LNXLIBS	   = ../libutil/libutil_lnx.a
+LNXLIBS	   = $(objdir)/com32/libutil/libutil_lnx.a
 
 MODULES	  = menu.c32 vesamenu.c32
 TESTFILES =
 
-COMMONOBJS = menumain.o readconfig.o passwd.o drain.o printmsg.o colors.o \
-	background.o refstr.o execute.o
+COMMONOBJS = menumain.o readconfig.o passwd.o drain.o \
+		printmsg.o colors.o background.o refstr.o
 
 all: $(MODULES) $(TESTFILES)
 
-menu.elf : menu.o $(COMMONOBJS) $(LIBS) $(C_LIBS)
+menu.elf : menu.o $(COMMONOBJS) $(C_LIBS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
-vesamenu.elf : vesamenu.o $(COMMONOBJS) $(LIBS) $(C_LIBS)
+vesamenu.elf : vesamenu.o $(COMMONOBJS) $(C_LIBS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
 tidy dist:

@@ -36,7 +36,6 @@
 void main_show_pci(int argc __unused, char **argv __unused,
 		   struct s_hardware *hardware)
 {
-    cli_detect_pci(hardware);
     reset_more_printf();
     more_printf("PCI\n");
     more_printf(" NB Devices   : %d\n", hardware->nb_pci_devices);
@@ -206,8 +205,8 @@ static void show_pci_devices(int argc __unused, char **argv __unused,
 			 pci_device->product,
 			 pci_device->sub_vendor, pci_device->sub_product);
 
-	    more_printf(first_line);
-	    more_printf(second_line);
+	    more_printf("%s", first_line);
+	    more_printf("%s", second_line);
 	    more_printf("\n");
 	} else if (nopciids == true) {
 	    if (nomodulesfile == true) {
@@ -267,14 +266,17 @@ struct cli_callback_descr list_pci_show_modules[] = {
     {
      .name = CLI_IRQ,
      .exec = show_pci_irq,
+     .nomodule=false,
      },
     {
      .name = CLI_PCI_DEVICE,
      .exec = show_pci_device,
+     .nomodule=false,
      },
     {
      .name = NULL,
      .exec = NULL,
+     .nomodule=false,
      },
 };
 
@@ -290,29 +292,3 @@ struct cli_mode_descr pci_mode = {
     .show_modules = &pci_show_modules,
     .set_modules = NULL,
 };
-
-void cli_detect_pci(struct s_hardware *hardware)
-{
-    bool error = false;
-    if (hardware->pci_detection == false) {
-	detect_pci(hardware);
-	if (hardware->pci_ids_return_code == -ENOPCIIDS) {
-	    more_printf
-		("The pci.ids file is missing, device names can't be computed.\n");
-	    more_printf("Please put one in same dir as hdt\n");
-	    error = true;
-	}
-	if ((hardware->modules_pcimap_return_code == -ENOMODULESPCIMAP) &&
-	    (hardware->modules_alias_return_code == -ENOMODULESALIAS)) {
-	    more_printf
-		("The modules.pcimap or modules.alias files are missing, device names can't be computed.\n");
-	    more_printf("Please put one of them in same dir as hdt\n");
-	    error = true;
-	}
-	if (error == true) {
-	    char tempbuf[10];
-	    more_printf("Press enter to continue\n");
-	    fgets(tempbuf, sizeof(tempbuf), stdin);
-	}
-    }
-}

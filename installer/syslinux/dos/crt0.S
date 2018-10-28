@@ -4,27 +4,49 @@
 # error "This file assumes -mregparm=3 -DREGPARM=3"
 #endif
 
-	.section ".init","ax"
+	.section ".text","ax"
 	.globl _start
 	.type _start,@function
 _start:
 	# Align the stack and make sure the high half is zero
-	andl $0xfff8,%esp
+	andl $0xfffc,%esp
+
+	# DS, ES points to the PSP at this point
+	pushw %es		# Save PSP pointer
+	movw %cs,%ax
+	movw %ax,%ds
+	movw %ax,%es
 
 	# Clear the .bss
 	cld
 	xorl %eax,%eax
 	movw $__bss_start,%di
-	movw $_end+3,%cx
+	movw $__bss_end+3,%cx
 	subw %di,%cx
 	shrw $2,%cx
 	rep ; stosl
 
+	# Copy the PSP into our own segment
+	popw %fs		# FS -> PSP
+	movw $_PSP,%di
+	xorw %si,%si
+	movw $0x40,%cx
+	fs ; rep ; movsl
+
+	# Verify that this is a supportable DOS version
+	movw $0x3001,%ax
+	int $0x21
+	xchgb %ah,%al
+	movw %ax,dos_version
+	cmpw $0x0314,%ax	# DOS >= 3.20?
+	jae 1f			# If so, okay
+	movw $bad_dos,%dx	# Print error message
+	movb $0x09,%ah
+	int $0x21
+	int $0x20		# Die
+
+1:
 	# Compute argc and argv (assumes REGPARM)
-	xorl %edx,%edx
-	movzbw 0x80,%bx
-	movb %dl,0x81(%bx)	# Zero-terminate string
-	movb $0x81,%dl
 	pushl %eax		# Make space for argv
 	movl %esp,%eax
 	calll __parse_argv
@@ -33,7 +55,7 @@ _start:
 	# Initialize malloc
 	calll __init_memory_arena
 
-	# Now call main... (NOTE: gcc forces main to be regparm 0)
+	# Now call main
 	popl %eax		# argc
 	popl %edx		# argv
 	calll main
@@ -51,3 +73,19 @@ exit:
 1:	hlt
 	jmp 1b
 	.size exit,.-exit
+
+	.section ".rodata","a"
+bad_dos:
+	.ascii "Unsupported DOS version\r\n$"
+	.size bad_dos,.-bad_dos
+
+	.section ".bss","aw"
+	.balign 16
+	.globl _PSP
+_PSP:
+	.space 256
+	.size _PSP, .-_PSP
+
+	/* Purely for sanity */
+	.section ".null","a"
+	.long 0,0,0,0

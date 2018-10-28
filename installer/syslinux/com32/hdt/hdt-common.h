@@ -48,17 +48,20 @@
 #include "cpuid.h"
 #include "dmi/dmi.h"
 #include "hdt-ata.h"
-#include "../lib/sys/vesa/vesa.h"
+#include <lib/sys/vesa/vesa.h>
 #include <vpd/vpd.h>
 #include <libansi.h>
-
-/* Declare a variable or data structure as unused. */
-#define __unused __attribute__ (( unused ))
+#include <acpi/acpi.h>
+#include <libupload/upload_backend.h>
 
 /* This two values are used for switching for the menu to the CLI mode */
 #define HDT_SWITCH_TO_CLI "hdt_switch_to_cli"
+#define HDT_DUMP "hdt_dump"
 #define HDT_RETURN_TO_CLI 100
 #define MAX_VESA_MODES 255
+
+/* This value is used for rebooting from the menu mode */
+#define HDT_REBOOT "hdt_reboot"
 
 /* The maximum number of commands we can process */
 #define MAX_NB_AUTO_COMMANDS 255
@@ -67,7 +70,7 @@
 /* The char that separate two commands */
 #define AUTO_SEPARATOR ";"
 /* The char that surround the list of commands */
-#define AUTO_DELIMITER "'"
+#define AUTO_DELIMITER '\'' 
 
 /* Graphic to load in background when using the vesa mode */
 #define CLI_DEFAULT_BACKGROUND "backgnd.png"
@@ -76,11 +79,22 @@
 #define MAX_CLI_LINES 20
 #define MAX_VESA_CLI_LINES 24
 
+struct upload_backend *upload;
+
 /* Defines if the cli is quiet*/
 bool quiet;
 
+/* Defines if the cli is totally silent*/
+bool silent;
+
 /* Defines if we must use the vesa mode */
 bool vesamode;
+
+/* Defines if we must use the menu mode */
+bool menumode;
+
+/* Defines if we are running the auto mode */
+bool automode;
 
 /* Defines the number of lines in the console
  * Default is 20 for a std console */
@@ -100,16 +114,18 @@ extern bool disable_more_printf;
  * one \n (and only one)
  */
 #define more_printf(...) do {\
- if (__likely(!disable_more_printf)) {\
-  if (display_line_nb == max_console_lines) {\
-   display_line_nb=0;\
-   printf("\n--More--");\
-   get_key(stdin, 0);\
-   printf("\033[2K\033[1G\033[1F");\
+ if (__likely(!silent)) {\
+  if (__likely(!disable_more_printf)) {\
+   if (display_line_nb == max_console_lines) {\
+    display_line_nb=0;\
+    printf("\n--More--");\
+    get_key(stdin, 0);\
+    printf("\033[2K\033[1G\033[1F");\
+   }\
+   display_line_nb++;\
   }\
-  display_line_nb++;\
+  printf(__VA_ARGS__);\
  }\
- printf(__VA_ARGS__);\
 } while (0);
 
 /* Display CPU registers for debugging purposes */
@@ -163,7 +179,9 @@ struct s_vesa {
 struct s_hardware {
     s_dmi dmi;			/* DMI table */
     s_cpu cpu;			/* CPU information */
+    uint8_t physical_cpu_count; /* Number of physical cpu */
     s_vpd vpd;			/* VPD information */
+    s_acpi acpi;
     struct pci_domain *pci_domain;	/* PCI Devices */
     struct driveinfo disk_info[256];	/* Disk Information */
     uint32_t mbr_ids[256];	/* MBR ids */
@@ -180,6 +198,7 @@ struct s_hardware {
     bool is_pxe_valid;
     bool is_vesa_valid;
     bool is_vpd_valid;
+    bool is_acpi_valid;
 
     bool dmi_detection;		/* Does the dmi stuff has already been detected? */
     bool pci_detection;		/* Does the pci stuff has already been detected? */
@@ -189,16 +208,20 @@ struct s_hardware {
     bool vesa_detection;	/* Does the vesa sutff have been already detected? */
     bool vpd_detection;		/* Does the vpd stuff has already been detected? */
     bool memory_detection;	/* Does the memory size got detected ?*/
+    bool acpi_detection;	/* Does the acpi got detected ?*/
 
     char syslinux_fs[22];
     const struct syslinux_version *sv;
     char modules_pcimap_path[255];
     char modules_alias_path[255];
     char pciids_path[255];
+    char dump_path[255]; /* Dump path on the tftp server */
+    char dump_filename[255]; /* Dump filename on the tftp server */
+    char tftp_ip[255];   /* IP address of tftp server (dump mode) */
     char memtest_label[255];
-    char reboot_label[255];
     char auto_label[AUTO_COMMAND_SIZE];
     char vesa_background[255];
+    char postexec[255];
 };
 
 void reset_more_printf(void);
@@ -216,9 +239,12 @@ int detect_pxe(struct s_hardware *hardware);
 void init_hardware(struct s_hardware *hardware);
 void clear_screen(void);
 void detect_syslinux(struct s_hardware *hardware);
+int detect_acpi(struct s_hardware *hardware);
 void detect_parameters(const int argc, const char *argv[],
 		       struct s_hardware *hardware);
 int detect_vesa(struct s_hardware *hardware);
 void detect_memory(struct s_hardware *hardware);
 void init_console(struct s_hardware *hardware);
+void detect_hardware(struct s_hardware *hardware);
+void dump(struct s_hardware *hardware);
 #endif

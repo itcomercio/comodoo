@@ -240,7 +240,7 @@ class DiskSet:
         except parted.error, msg:
             '''A entire zero disk hasn't partition table.
             Parted open() need a disk label for normal operation'''
-            log.error("ivalid partition table: %s" % msg)
+            self.log.error("ivalid partition table: %s" % msg)
             label = label = parted.disk_type_get('msdos')
             disk = parted_dev.disk_new_fresh(label)
             disk.commit()
@@ -302,8 +302,8 @@ class DiskSet:
         heads, sectors, cylinders,)
         size_cad = "Disk /dev/sdb size: %s\n" % (
         self.convert_bytes(sizeInBytes),)
-        log.info(geometry_cad)
-        log.info(size_cad)
+        self.log.info(geometry_cad)
+        self.log.info(size_cad)
 
         # Create Disk object
         target_disk = parted.freshDisk(target_device, "msdos")

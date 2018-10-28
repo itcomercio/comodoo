@@ -32,21 +32,19 @@
  */
 
 #include <klibc/compiler.h>
+#include <syslinux/firmware.h>
 #include <syslinux/config.h>
 #include <string.h>
-#include <com32.h>
 
 struct syslinux_serial_console_info __syslinux_serial_console_info;
 
-void __constructor __syslinux_get_serial_console_info(void)
+void __syslinux_set_serial_console_info(void)
 {
-    static com32sys_t reg;
+    uint16_t iobase, divisor, flowctl;
 
-    memset(&reg, 0, sizeof reg);
-    reg.eax.w[0] = 0x000b;
-    __intcall(0x22, &reg, &reg);
+    firmware->get_serial_console_info(&iobase, &divisor, &flowctl);
 
-    __syslinux_serial_console_info.iobase = reg.edx.w[0];
-    __syslinux_serial_console_info.divisor = reg.ecx.w[0];
-    __syslinux_serial_console_info.flowctl = reg.ebx.w[0];
+    __syslinux_serial_console_info.iobase = iobase;
+    __syslinux_serial_console_info.divisor = divisor;
+    __syslinux_serial_console_info.flowctl = flowctl;
 }

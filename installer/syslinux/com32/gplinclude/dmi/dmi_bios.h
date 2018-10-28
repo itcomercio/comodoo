@@ -14,15 +14,15 @@
 #define DMI_BIOS_H
 
 #include "stdbool.h"
-#define BIOS_VENDOR_SIZE		32
-#define BIOS_VERSION_SIZE		32
-#define BIOS_RELEASE_SIZE		16
+#define BIOS_VENDOR_SIZE		65
+#define BIOS_VERSION_SIZE		65
+#define BIOS_RELEASE_SIZE		65
 #define BIOS_RUNTIME_SIZE_UNIT_SIZE	16
 #define BIOS_ROM_UNIT_SIZE		16
 #define BIOS_BIOS_REVISION_SIZE		16
 #define BIOS_FIRMWARE_REVISION_SIZE	16
 
-#define BIOS_CHAR_NB_ELEMENTS		28
+#define BIOS_CHAR_NB_ELEMENTS		29
 #define BIOS_CHAR_X1_NB_ELEMENTS	8
 #define BIOS_CHAR_X2_NB_ELEMENTS	3
 
@@ -46,6 +46,7 @@ typedef struct {
     bool boot_from_cd;
     bool selectable_boot;
     bool bios_rom_socketed;
+    bool boot_from_pcmcia;
     bool edd;
     bool japanese_floppy_nec_9800_1_2MB;
     bool japanese_floppy_toshiba_1_2MB;

@@ -1868,7 +1868,8 @@ int main(int argc, char **argv) {
     extraArgs[0] = NULL;
     parseCmdLineFlags(&loaderData, cmdLine);
 
-    logMessage(INFO, "anaconda/loader version %s on %s starting", VERSION, getProductArch());
+    logMessage(INFO, "anaconda/loader version %s on %s starting", VERSION,
+            getProductArch());
 
     if ((FL_SERIAL(flags) || FL_VIRTPCONSOLE(flags)) && 
         !hasGraphicalOverride()) {
@@ -2050,6 +2051,7 @@ int main(int argc, char **argv) {
     add_to_path_env("LD_LIBRARY_PATH", "/tmp/product");
     add_to_path_env("PATH", "/tmp/updates");
     add_to_path_env("PATH", "/tmp/product");
+    add_to_path_env("TERM", "linux");
     add_to_path_env("DBUS_SYSTEM_BUS_ADDRESS",
             "unix:path=/run/dbus/system_bus_socket");
 
@@ -2108,7 +2110,7 @@ int main(int argc, char **argv) {
      */
     //doShell();
 
-    *argptr++ = "--stage2";
+    //*argptr++ = "--stage2";
     if (strncmp(url, "ftp:", 4)) {
         *argptr++ = url;
     } else {
@@ -2238,7 +2240,7 @@ int main(int argc, char **argv) {
 
         if (!(pid = fork())) {
             setenv("ANACONDAVERSION", VERSION, 1);
-            if (execv(anacondaArgs[0], anacondaArgs) == -1) {
+            if (execv(anacondaArgs[0], NULL) == -1) {
                fprintf(stderr,"exec of anaconda failed, %s: %m\n", anacondaArgs[0]);
                exit(1);
             }

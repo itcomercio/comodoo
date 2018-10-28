@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 #include <minmax.h>
 #include <stdbool.h>
+#include <ilog2.h>
 #include <syslinux/loadfile.h>
 #include "vesa.h"
 #include "video.h"
@@ -204,7 +205,6 @@ static int read_jpeg_file(FILE * fp, uint8_t * header, int len)
     unsigned int bytes_per_row[1];
 
     rv = floadfile(fp, &jpeg_file, &length_of_file, header, len);
-    fclose(fp);
     if (rv)
 	goto err;
 
@@ -255,8 +255,7 @@ int vesacon_default_background(void)
 
     z = max(__vesa_info.mi.v_res, __vesa_info.mi.h_res) >> 1;
     z = ((z*z) >> 11) - 1;
-    asm("bsrl %1,%0" : "=r" (shft) : "rm" (z));
-    shft++;
+    shft = ilog2(z) + 1;
 
     for (y = 0, dy = -(__vesa_info.mi.v_res >> 1);
 	 y < __vesa_info.mi.v_res; y++, dy++) {

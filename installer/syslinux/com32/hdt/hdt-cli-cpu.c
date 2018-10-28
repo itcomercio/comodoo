@@ -38,12 +38,21 @@ void main_show_cpu(int argc __unused, char **argv __unused,
 		   struct s_hardware *hardware)
 {
     char features[81];
-    cpu_detect(hardware);
-    detect_dmi(hardware);
-    more_printf("CPU\n");
+    /* We know the total number of logical cores and we
+     * know the number of cores of the first CPU. Let's consider
+     * the system as symetrical, and so compute the number of
+     * physical CPUs. This is only possible if ACPI is present */
+    if (hardware->acpi.madt.processor_local_apic_count > 0) {
+	more_printf("CPU (%d logical / %d phys)\n",
+		    hardware->acpi.madt.processor_local_apic_count,
+		    hardware->physical_cpu_count);
+    } else
+	more_printf("CPU\n");
     more_printf(" Manufacturer : %s \n", hardware->cpu.vendor);
     more_printf(" Product      : %s \n", hardware->cpu.model);
     more_printf(" CPU Cores    : %d \n", hardware->cpu.num_cores);
+    if (hardware->dmi.processor.thread_count != 0)
+        more_printf(" CPU Threads  : %d \n", hardware->dmi.processor.thread_count);
     more_printf(" L2 Cache     : %dK\n", hardware->cpu.l2_cache_size);
 
     memset(features, 0, sizeof(features));
@@ -55,23 +64,33 @@ void main_show_cpu(int argc __unused, char **argv __unused,
 	strcat(features, "x86 32bit ");
     if (hardware->cpu.flags.smp)
 	strcat(features, "SMP ");
+
+    /* This CPU is featuring Intel or AMD Virtualisation Technology */
     if (hardware->cpu.flags.vmx || hardware->cpu.flags.svm)
 	strcat(features, "HwVIRT ");
 
     more_printf("%s\n", features);
 }
 
-static void show_flag(char *buffer, bool flag, char *flag_name, bool flush)
+/* Let's compute the cpu flags display
+ * We have to maximize the number of flags per line */
+static void show_flag(char *buffer, size_t len, bool flag, char *flag_name, bool flush)
 {
     char output_buffer[81];
+    /* Flush is only set when no more flags are present
+     * When it's set, or if the line is complete,
+     * we have to end the string computation and display the line.
+     * Before adding the flag into the buffer, let's check that adding it
+     * will not overflow the rendering.*/
     if ((((strlen(buffer) + strlen(flag_name)) > 66) && flag) || flush) {
 	snprintf(output_buffer, sizeof output_buffer, "Flags     : %s\n",
 		 buffer);
-	more_printf(output_buffer);
-	memset(buffer, 0, sizeof(buffer));
+	more_printf("%s", output_buffer);
+	memset(buffer, 0, len);
 	if (flush)
 	    return;
     }
+    /* Let's add the flag name only if the flag is present */
     if (flag)
 	strcat(buffer, flag_name);
 }
@@ -81,10 +100,24 @@ static void show_cpu(int argc __unused, char **argv __unused,
 {
     char buffer[81];
     reset_more_printf();
-    more_printf("CPU\n");
+    /* We know the total number of logical cores and we
+     * know the number of cores of the first CPU. Let's consider
+     * the system as symetrical, and so compute the number of
+     * physical CPUs. This is only possible if ACPI is present*/
+    if (hardware->acpi.madt.processor_local_apic_count > 0) {
+	more_printf("CPU (%d logical / %d phys)\n",
+		    hardware->acpi.madt.processor_local_apic_count,
+		    hardware->acpi.madt.processor_local_apic_count /
+		    hardware->cpu.num_cores);
+    } else
+	more_printf("CPU\n");
     more_printf("Vendor    : %s\n", hardware->cpu.vendor);
     more_printf("Model     : %s\n", hardware->cpu.model);
     more_printf("CPU Cores : %d\n", hardware->cpu.num_cores);
+    if (hardware->dmi.processor.core_enabled != 0)
+        more_printf("CPU Enable: %d\n", hardware->dmi.processor.core_enabled);
+    if (hardware->dmi.processor.thread_count != 0)
+        more_printf("CPU Thread: %d \n", hardware->dmi.processor.thread_count);
     more_printf("L1 Cache  : %dK + %dK (I + D) \n",
 		hardware->cpu.l1_instruction_cache_size,
 		hardware->cpu.l1_data_cache_size);
@@ -104,11 +137,13 @@ static void show_cpu(int argc __unused, char **argv __unused,
 		    hardware->dmi.processor.voltage_mv -
 		    ((hardware->dmi.processor.voltage_mv / 1000) * 1000));
     }
+
     if (hardware->cpu.flags.smp) {
 	more_printf("SMP       : yes\n");
     } else {
 	more_printf("SMP       : no\n");
     }
+
     if (hardware->cpu.flags.lm) {
 	more_printf("x86_64    : yes\n");
     } else {
@@ -121,96 +156,97 @@ static void show_cpu(int argc __unused, char **argv __unused,
 	more_printf("HwVirt    : no\n");
     }
 
+    /* Let's display the supported cpu flags */
     memset(buffer, 0, sizeof(buffer));
-    show_flag(buffer, hardware->cpu.flags.fpu, "fpu ", false);
-    show_flag(buffer, hardware->cpu.flags.vme, "vme ", false);
-    show_flag(buffer, hardware->cpu.flags.de, "de ", false);
-    show_flag(buffer, hardware->cpu.flags.pse, "pse ", false);
-    show_flag(buffer, hardware->cpu.flags.tsc, "tsc ", false);
-    show_flag(buffer, hardware->cpu.flags.msr, "msr ", false);
-    show_flag(buffer, hardware->cpu.flags.pae, "pae ", false);
-    show_flag(buffer, hardware->cpu.flags.mce, "mce ", false);
-    show_flag(buffer, hardware->cpu.flags.cx8, "cx8 ", false);
-    show_flag(buffer, hardware->cpu.flags.apic, "apic ", false);
-    show_flag(buffer, hardware->cpu.flags.sep, "sep ", false);
-    show_flag(buffer, hardware->cpu.flags.mtrr, "mtrr ", false);
-    show_flag(buffer, hardware->cpu.flags.pge, "pge ", false);
-    show_flag(buffer, hardware->cpu.flags.mca, "mca ", false);
-    show_flag(buffer, hardware->cpu.flags.cmov, "cmov ", false);
-    show_flag(buffer, hardware->cpu.flags.pat, "pat ", false);
-    show_flag(buffer, hardware->cpu.flags.pse_36, "pse_36 ", false);
-    show_flag(buffer, hardware->cpu.flags.psn, "psn ", false);
-    show_flag(buffer, hardware->cpu.flags.clflsh, "clflsh ", false);
-    show_flag(buffer, hardware->cpu.flags.dts, "dts ", false);
-    show_flag(buffer, hardware->cpu.flags.acpi, "acpi ", false);
-    show_flag(buffer, hardware->cpu.flags.mmx, "mmx ", false);
-    show_flag(buffer, hardware->cpu.flags.sse, "sse ", false);
-    show_flag(buffer, hardware->cpu.flags.sse2, "sse2 ", false);
-    show_flag(buffer, hardware->cpu.flags.ss, "ss ", false);
-    show_flag(buffer, hardware->cpu.flags.htt, "ht ", false);
-    show_flag(buffer, hardware->cpu.flags.acc, "acc ", false);
-    show_flag(buffer, hardware->cpu.flags.syscall, "syscall ", false);
-    show_flag(buffer, hardware->cpu.flags.mp, "mp ", false);
-    show_flag(buffer, hardware->cpu.flags.nx, "nx ", false);
-    show_flag(buffer, hardware->cpu.flags.mmxext, "mmxext ", false);
-    show_flag(buffer, hardware->cpu.flags.lm, "lm ", false);
-    show_flag(buffer, hardware->cpu.flags.nowext, "3dnowext ", false);
-    show_flag(buffer, hardware->cpu.flags.now, "3dnow! ", false);
-    show_flag(buffer, hardware->cpu.flags.svm, "svm ", false);
-    show_flag(buffer, hardware->cpu.flags.vmx, "vmx ", false);
-    show_flag(buffer, hardware->cpu.flags.pbe, "pbe ", false);
-    show_flag(buffer, hardware->cpu.flags.fxsr_opt, "fxsr_opt ", false);
-    show_flag(buffer, hardware->cpu.flags.gbpages, "gbpages ", false);
-    show_flag(buffer, hardware->cpu.flags.rdtscp, "rdtscp ", false);
-    show_flag(buffer, hardware->cpu.flags.pni, "pni ", false);
-    show_flag(buffer, hardware->cpu.flags.pclmulqd, "pclmulqd ", false);
-    show_flag(buffer, hardware->cpu.flags.dtes64, "dtes64 ", false);
-    show_flag(buffer, hardware->cpu.flags.smx, "smx ", false);
-    show_flag(buffer, hardware->cpu.flags.est, "est ", false);
-    show_flag(buffer, hardware->cpu.flags.tm2, "tm2 ", false);
-    show_flag(buffer, hardware->cpu.flags.sse3, "sse3 ", false);
-    show_flag(buffer, hardware->cpu.flags.fma, "fma ", false);
-    show_flag(buffer, hardware->cpu.flags.cx16, "cx16 ", false);
-    show_flag(buffer, hardware->cpu.flags.xtpr, "xtpr ", false);
-    show_flag(buffer, hardware->cpu.flags.pdcm, "pdcm ", false);
-    show_flag(buffer, hardware->cpu.flags.dca, "dca ", false);
-    show_flag(buffer, hardware->cpu.flags.xmm4_1, "xmm4_1 ", false);
-    show_flag(buffer, hardware->cpu.flags.xmm4_2, "xmm4_2 ", false);
-    show_flag(buffer, hardware->cpu.flags.x2apic, "x2apic ", false);
-    show_flag(buffer, hardware->cpu.flags.movbe, "movbe ", false);
-    show_flag(buffer, hardware->cpu.flags.popcnt, "popcnt ", false);
-    show_flag(buffer, hardware->cpu.flags.aes, "aes ", false);
-    show_flag(buffer, hardware->cpu.flags.xsave, "xsave ", false);
-    show_flag(buffer, hardware->cpu.flags.osxsave, "osxsave ", false);
-    show_flag(buffer, hardware->cpu.flags.avx, "avx ", false);
-    show_flag(buffer, hardware->cpu.flags.hypervisor, "hypervisor ", false);
-    show_flag(buffer, hardware->cpu.flags.ace2, "ace2 ", false);
-    show_flag(buffer, hardware->cpu.flags.ace2_en, "ace2_en ", false);
-    show_flag(buffer, hardware->cpu.flags.phe, "phe ", false);
-    show_flag(buffer, hardware->cpu.flags.phe_en, "phe_en ", false);
-    show_flag(buffer, hardware->cpu.flags.pmm, "pmm ", false);
-    show_flag(buffer, hardware->cpu.flags.pmm_en, "pmm_en ", false);
-    show_flag(buffer, hardware->cpu.flags.extapic, "extapic ", false);
-    show_flag(buffer, hardware->cpu.flags.cr8_legacy, "cr8_legacy ", false);
-    show_flag(buffer, hardware->cpu.flags.abm, "abm ", false);
-    show_flag(buffer, hardware->cpu.flags.sse4a, "sse4a ", false);
-    show_flag(buffer, hardware->cpu.flags.misalignsse, "misalignsse ", false);
-    show_flag(buffer, hardware->cpu.flags.nowprefetch, "3dnowprefetch ", false);
-    show_flag(buffer, hardware->cpu.flags.osvw, "osvw ", false);
-    show_flag(buffer, hardware->cpu.flags.ibs, "ibs ", false);
-    show_flag(buffer, hardware->cpu.flags.sse5, "sse5 ", false);
-    show_flag(buffer, hardware->cpu.flags.skinit, "skinit ", false);
-    show_flag(buffer, hardware->cpu.flags.wdt, "wdt ", false);
-    show_flag(buffer, hardware->cpu.flags.ida, "ida ", false);
-    show_flag(buffer, hardware->cpu.flags.arat, "arat ", false);
-    show_flag(buffer, hardware->cpu.flags.tpr_shadow, "tpr_shadow ", false);
-    show_flag(buffer, hardware->cpu.flags.vnmi, "vnmi ", false);
-    show_flag(buffer, hardware->cpu.flags.flexpriority, "flexpriority ", false);
-    show_flag(buffer, hardware->cpu.flags.ept, "ept ", false);
-    show_flag(buffer, hardware->cpu.flags.vpid, "vpid ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.fpu, "fpu ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.vme, "vme ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.de, "de ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pse, "pse ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.tsc, "tsc ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.msr, "msr ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pae, "pae ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.mce, "mce ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.cx8, "cx8 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.apic, "apic ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.sep, "sep ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.mtrr, "mtrr ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pge, "pge ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.mca, "mca ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.cmov, "cmov ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pat, "pat ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pse_36, "pse_36 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.psn, "psn ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.clflsh, "clflsh ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.dts, "dts ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.acpi, "acpi ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.mmx, "mmx ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.sse, "sse ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.sse2, "sse2 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.ss, "ss ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.htt, "ht ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.acc, "acc ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.syscall, "syscall ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.mp, "mp ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.nx, "nx ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.mmxext, "mmxext ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.lm, "lm ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.nowext, "3dnowext ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.now, "3dnow! ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.svm, "svm ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.vmx, "vmx ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pbe, "pbe ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.fxsr_opt, "fxsr_opt ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.gbpages, "gbpages ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.rdtscp, "rdtscp ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pni, "pni ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pclmulqd, "pclmulqd ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.dtes64, "dtes64 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.smx, "smx ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.est, "est ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.tm2, "tm2 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.sse3, "sse3 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.fma, "fma ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.cx16, "cx16 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.xtpr, "xtpr ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pdcm, "pdcm ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.dca, "dca ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.xmm4_1, "xmm4_1 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.xmm4_2, "xmm4_2 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.x2apic, "x2apic ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.movbe, "movbe ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.popcnt, "popcnt ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.aes, "aes ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.xsave, "xsave ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.osxsave, "osxsave ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.avx, "avx ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.hypervisor, "hypervisor ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.ace2, "ace2 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.ace2_en, "ace2_en ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.phe, "phe ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.phe_en, "phe_en ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pmm, "pmm ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.pmm_en, "pmm_en ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.extapic, "extapic ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.cr8_legacy, "cr8_legacy ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.abm, "abm ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.sse4a, "sse4a ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.misalignsse, "misalignsse ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.nowprefetch, "3dnowprefetch ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.osvw, "osvw ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.ibs, "ibs ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.sse5, "sse5 ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.skinit, "skinit ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.wdt, "wdt ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.ida, "ida ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.arat, "arat ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.tpr_shadow, "tpr_shadow ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.vnmi, "vnmi ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.flexpriority, "flexpriority ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.ept, "ept ", false);
+    show_flag(buffer, sizeof(buffer), hardware->cpu.flags.vpid, "vpid ", false);
 
-    /* Let's flush the remaining flags */
-    show_flag(buffer, false, "", true);
+    /* No more flags, let's display the remaining flags */
+    show_flag(buffer, sizeof(buffer), false, "", true);
 }
 
 struct cli_module_descr cpu_show_modules = {

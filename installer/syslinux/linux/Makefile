@@ -11,26 +11,32 @@
 ## -----------------------------------------------------------------------
 
 ##
-## Linux FAT installer
+## Linux FAT/NTFS installer
 ##
 
-topdir = ..
-include $(topdir)/MCONFIG
+include $(MAKEDIR)/syslinux.mk
 
 OPTFLAGS = -g -Os
-INCLUDES = -I. -I.. -I../libinstaller
+INCLUDES = -I$(SRC) -I$(objdir) -I$(SRC)/../libinstaller
 CFLAGS	 = $(GCCWARN) -D_FILE_OFFSET_BITS=64 $(OPTFLAGS) $(INCLUDES)
-LDFLAGS	 = -s
+LDFLAGS	 = 
 
 SRCS     = syslinux.c \
+	   ../libinstaller/syslxopt.c \
+	   ../libinstaller/syslxrw.c \
+	   ../libinstaller/syslxcom.c \
+	   ../libinstaller/setadv.c \
+	   ../libinstaller/advio.c \
+           ../libinstaller/fs.c \
            ../libinstaller/syslxmod.c \
 	   ../libinstaller/bootsect_bin.c \
+	   ../libinstaller/ldlinuxc32_bin.c \
 	   ../libinstaller/ldlinux_bin.c
 OBJS	 = $(patsubst %.c,%.o,$(notdir $(SRCS)))
 
 .SUFFIXES: .c .o .i .s .S
 
-VPATH = .:../libinstaller
+VPATH = $(SRC):$(SRC)/../libinstaller:$(OBJ)/../libinstaller
 
 all: installer
 
@@ -51,6 +57,9 @@ syslinux: $(OBJS)
 syslinux-nomtools: syslinux
 	ln -f $< $@
 
+strip:
+	$(STRIP) syslinux syslinux-nomtools
+
 %.o: %.c
 	$(CC) $(UMAKEDEPS) $(CFLAGS) -c -o $@ $<
 %.i: %.c
@@ -58,4 +67,4 @@ syslinux-nomtools: syslinux
 %.s: %.c
 	$(CC) $(UMAKEDEPS) $(CFLAGS) -S -o $@ $<
 
--include .*.d *.tmp
+-include .*.d

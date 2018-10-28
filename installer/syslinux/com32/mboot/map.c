@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 2007-2008 H. Peter Anvin - All Rights Reserved
- *   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+ *   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
  *
  *   Permission is hereby granted, free of charge, to any person
  *   obtaining a copy of this software and associated documentation
@@ -53,7 +53,7 @@ addr_t map_data(const void *data, size_t len, size_t align, int flags)
     addr_t pad = (flags & MAP_NOPAD) ? 0 : -len & (align - 1);
     addr_t xlen = len + pad;
 
-    if (syslinux_memmap_find(amap, SMT_FREE, &start, &xlen, align) ||
+    if (syslinux_memmap_find_type(amap, SMT_FREE, &start, &xlen, align) ||
 	syslinux_add_memmap(&amap, start, len + pad, SMT_ALLOC) ||
 	syslinux_add_movelist(&ml, start, (addr_t) data, len) ||
 	(pad && syslinux_add_memmap(&mmap, start + len, pad, SMT_ZERO))) {
@@ -61,7 +61,7 @@ addr_t map_data(const void *data, size_t len, size_t align, int flags)
 	return 0;
     }
 
-    dprintf("Mapping 0x%08x bytes (%#x pad) at 0x%08x\n", len, pad, start);
+    dprintf("Mapping 0x%08zx bytes (%#x pad) at 0x%08x\n", len, pad, start);
 
     if (start + len + pad > mboot_high_water_mark)
 	mboot_high_water_mark = start + len + pad;
@@ -91,10 +91,9 @@ int init_map(void)
 	error("Failed to allocate initial memory map!\n");
 	return -1;
     }
-#if DEBUG
+
     dprintf("Initial memory map:\n");
-    syslinux_dump_memmap(stdout, mmap);
-#endif
+    syslinux_dump_memmap(mmap);
 
     return 0;
 }
@@ -107,15 +106,20 @@ struct multiboot_header *map_image(void *ptr, size_t len)
     Elf32_Ehdr *eh = ptr;
     Elf32_Phdr *ph;
     Elf32_Shdr *sh;
-    unsigned int i;
+
+    Elf64_Ehdr *eh64 = ptr;
+    Elf64_Phdr *ph64;
+    Elf64_Shdr *sh64;
+
+    unsigned int i, mbh_offset;
     uint32_t bad_flags;
 
     /*
      * Search for the multiboot header...
      */
     mbh_len = 0;
-    for (i = 0; i < MULTIBOOT_SEARCH; i += 4) {
-	mbh = (struct multiboot_header *)((char *)ptr + i);
+    for (mbh_offset = 0; mbh_offset < MULTIBOOT_SEARCH; mbh_offset += 4) {
+	mbh = (struct multiboot_header *)((char *)ptr + mbh_offset);
 	if (mbh->magic != MULTIBOOT_MAGIC)
 	    continue;
 	if (mbh->magic + mbh->flags + mbh->checksum)
@@ -127,7 +131,7 @@ struct multiboot_header *map_image(void *ptr, size_t len)
 	else
 	    mbh_len = 12;
 
-	if (i + mbh_len > len)
+	if (mbh_offset + mbh_len > len)
 	    mbh_len = 0;	/* Invalid... */
 	else
 	    break;		/* Found something... */
@@ -151,6 +155,22 @@ struct multiboot_header *map_image(void *ptr, size_t len)
 	!eh->e_phnum || eh->e_phoff + eh->e_phentsize * eh->e_phnum > len)
 	eh = NULL;		/* No valid ELF header found */
 
+    /* Determine 64-bit images */
+    if ((eh != NULL) ||
+	len < sizeof(Elf64_Ehdr) ||
+	memcmp(eh64->e_ident, "\x7f" "ELF\2\1\1", 6) ||
+	(eh64->e_machine != EM_X86_64) ||
+	eh64->e_version != EV_CURRENT ||
+	eh64->e_ehsize < sizeof(Elf64_Ehdr) || eh64->e_ehsize >= len ||
+	eh64->e_phentsize < sizeof(Elf64_Phdr) ||
+	!eh64->e_phnum ||
+	eh64->e_phoff + eh64->e_phentsize * eh64->e_phnum > len)
+	eh64 = NULL;		/* No valid ELF64 header found */
+
+    /* Is this a Solaris kernel? */
+    if (!set.solaris && eh && kernel_is_solaris(eh))
+	opt.solaris = true;
+
     /*
      * Note: the Multiboot Specification implies that AOUT_KLUDGE should
      * have precedence over the ELF header.  However, Grub disagrees, and
@@ -165,7 +185,7 @@ struct multiboot_header *map_image(void *ptr, size_t len)
 
 	for (i = 0; i < eh->e_phnum; i++) {
 	    if (ph->p_type == PT_LOAD || ph->p_type == PT_PHDR) {
-		/* 
+		/*
 		 * This loads at p_paddr, which matches Grub.  However, if
 		 * e_entry falls within the p_vaddr range of this PHDR, then
 		 * adjust it to match the p_paddr range... this is how Grub
@@ -262,18 +282,135 @@ struct multiboot_header *map_image(void *ptr, size_t len)
 		sh[i].sh_addr = addr;
 	    }
 	}
+    } else if (eh64 && !(opt.aout && mbh_len &&
+			(mbh->flags & MULTIBOOT_AOUT_KLUDGE))) {
+        /* Load 64-bit ELF */
+	regs.eip = eh64->e_entry;	/* Can be overridden further down... */
+
+	ph64 = (Elf64_Phdr *) (cptr + eh64->e_phoff);
+
+	for (i = 0; i < eh64->e_phnum; i++) {
+	    if (ph64->p_type == PT_LOAD || ph64->p_type == PT_PHDR) {
+		/*
+		 * This loads at p_paddr, which matches Grub.  However, if
+		 * e_entry falls within the p_vaddr range of this PHDR, then
+		 * adjust it to match the p_paddr range... this is how Grub
+		 * behaves, so it's by definition correct (it doesn't have to
+		 * make sense...)
+		 */
+		addr_t addr = ph64->p_paddr;
+		addr_t msize = ph64->p_memsz;
+		addr_t dsize = min(msize, ph64->p_filesz);
+
+		if (eh64->e_entry >= ph64->p_vaddr
+		    && eh64->e_entry < ph64->p_vaddr + msize)
+		    regs.eip = eh64->e_entry + (ph64->p_paddr - ph64->p_vaddr);
+
+		dprintf("Segment at 0x%08x data 0x%08x len 0x%08x\n",
+			addr, dsize, msize);
+
+		if (syslinux_memmap_type(amap, addr, msize) != SMT_FREE) {
+		    printf
+			("Memory segment at 0x%08x (len 0x%08x) is unavailable\n",
+			 addr, msize);
+		    return NULL;	/* Memory region unavailable */
+		}
+
+		/* Mark this region as allocated in the available map */
+		if (syslinux_add_memmap(&amap, addr, msize, SMT_ALLOC)) {
+		    error("Overlapping segments found in ELF header\n");
+		    return NULL;
+		}
+
+		if (ph64->p_filesz) {
+		    /* Data present region.  Create a move entry for it. */
+		    if (syslinux_add_movelist
+			(&ml, addr, (addr_t) cptr + ph64->p_offset, dsize)) {
+			error("Failed to map PHDR data\n");
+			return NULL;
+		    }
+		}
+		if (msize > dsize) {
+		    /* Zero-filled region.  Mark as a zero region in the memory map. */
+		    if (syslinux_add_memmap
+			(&mmap, addr + dsize, msize - dsize, SMT_ZERO)) {
+			error("Failed to map PHDR zero region\n");
+			return NULL;
+		    }
+		}
+		if (addr + msize > mboot_high_water_mark)
+		    mboot_high_water_mark = addr + msize;
+	    } else {
+		/* Ignore this program header */
+	    }
+
+	    ph64 = (Elf64_Phdr *) ((char *)ph64 + eh64->e_phentsize);
+	}
+
+	/* Load the ELF symbol table */
+	if (eh64->e_shoff) {
+	    addr_t addr, len;
+
+	    sh64 = (Elf64_Shdr *) ((char *)eh64 + eh64->e_shoff);
+
+	    len = eh64->e_shentsize * eh64->e_shnum;
+	    /*
+	     * Align this, but don't pad -- in general this means a bunch of
+	     * smaller sections gets packed into a single page.
+	     */
+	    addr = map_data(sh64, len, 4096, MAP_HIGH | MAP_NOPAD);
+	    if (!addr) {
+		error("Failed to map symbol table\n");
+		return NULL;
+	    }
+
+	    mbinfo.flags |= MB_INFO_ELF_SHDR;
+	    mbinfo.syms.e.addr = addr;
+	    mbinfo.syms.e.num = eh64->e_shnum;
+	    mbinfo.syms.e.size = eh64->e_shentsize;
+	    mbinfo.syms.e.shndx = eh64->e_shstrndx;
+
+	    for (i = 0; i < eh64->e_shnum; i++) {
+		addr_t align;
+
+		if (!sh64[i].sh_size)
+		    continue;	/* Empty section */
+		if (sh64[i].sh_flags & SHF_ALLOC)
+		    continue;	/* SHF_ALLOC sections should have PHDRs */
+
+		align = sh64[i].sh_addralign ? sh64[i].sh_addralign : 0;
+		addr = map_data((char *)ptr + sh64[i].sh_offset,
+				sh64[i].sh_size, align, MAP_HIGH);
+		if (!addr) {
+		    error("Failed to map symbol section\n");
+		    return NULL;
+		}
+		sh64[i].sh_addr = addr;
+	    }
+	}
     } else if (mbh_len && (mbh->flags & MULTIBOOT_AOUT_KLUDGE)) {
 	/*
 	 * a.out kludge thing...
 	 */
 	char *data_ptr;
 	addr_t data_len, bss_len;
+	addr_t bss_addr;
 
 	regs.eip = mbh->entry_addr;
 
 	data_ptr = (char *)mbh - (mbh->header_addr - mbh->load_addr);
-	data_len = mbh->load_end_addr - mbh->load_addr;
-	bss_len = mbh->bss_end_addr - mbh->load_end_addr;
+
+	if (mbh->load_end_addr)
+	    data_len = mbh->load_end_addr - mbh->load_addr;
+	else
+	    data_len = len - mbh_offset + (mbh->header_addr - mbh->load_addr);
+
+	bss_addr = mbh->load_addr + data_len;
+
+	if (mbh->bss_end_addr)
+	    bss_len = mbh->bss_end_addr - mbh->load_end_addr;
+	else
+	    bss_len = 0;
 
 	if (syslinux_memmap_type(amap, mbh->load_addr, data_len + bss_len)
 	    != SMT_FREE) {
@@ -294,12 +431,12 @@ struct multiboot_header *map_image(void *ptr, size_t len)
 	    }
 	if (bss_len)
 	    if (syslinux_add_memmap
-		(&mmap, mbh->load_end_addr, bss_len, SMT_ZERO)) {
+		(&mmap, bss_addr, bss_len, SMT_ZERO)) {
 		error("Failed to map a.out bss\n");
 		return NULL;
 	    }
-	if (mbh->bss_end_addr > mboot_high_water_mark)
-	    mboot_high_water_mark = mbh->bss_end_addr;
+	if (bss_addr + bss_len > mboot_high_water_mark)
+	    mboot_high_water_mark = bss_addr + bss_len;
     } else {
 	error
 	    ("Invalid Multiboot image: neither ELF header nor a.out kludge found\n");

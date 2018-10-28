@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------
  *
  *   Copyright 2007-2009 H. Peter Anvin - All Rights Reserved
- *   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+ *   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
  *
  *   Permission is hereby granted, free of charge, to any person
  *   obtaining a copy of this software and associated documentation
@@ -40,8 +40,6 @@ phdr		= stack		/* Above the stack, overwritten by bootsect */
 /* To handle > 32K we need to play segment tricks... */
 psec		= _phdr + 512
 
-/* BootGUID */
-bootguid	= _start + 0x1a8
 /* Where we put DS:SI */
 dssi_out	= _start + 0x1be
 
@@ -57,8 +55,8 @@ bootsec:
 	.text
 	.globl	_start
 _start:
+	.byte	0x33, 0xc0	/* xorw	%ax, %ax */
 	cli
-	xorw	%ax, %ax
 	movw	%ax, %ds
 	movw	%ax, %ss
 	movw	$stack, %sp
@@ -79,6 +77,12 @@ next:
 
 	ADJUST_DRIVE
 	pushw	%dx		/* 0(%bp) = %dl -> drive number */
+	movw	%sp, %bp	/* %bp -> frame pointer: LEAVE UNCHANGED */
+
+	/* prepare to read sector size */
+	sub	$0x1c, %sp	/* -28(%bp) == %sp */
+	pushw	$0x1e		/* -30(%bp) == %sp */
+	movw	$0x200, -6(%bp)	/* -6(%bp) sector size */
 
 	/* Check to see if we have EBIOS */
 	pushw	%dx		/* drive number */
@@ -88,6 +92,8 @@ next:
 	xorb	%dh, %dh
 	stc
 	int	$0x13
+	popw	%dx		/* restore drive */
+	movb	$0x08, %ah	/* get CHS geometry */
 	jc	1f
 	cmpw	$0xaa55, %bx
 	jne	1f
@@ -99,41 +105,43 @@ next:
 	movl	$0xeb42b4+((read_common-read_sector_cbios-4) << 24), \
 		(read_sector_cbios)
 
-1:
-	popw	%dx
+	/*
+	 * read sector size.
+	 * Should not fail but if it does I assume that at least
+	 * previous 512 value is not overridden
+	 */
+	movb	$0x48, %ah
+	movw	%sp, %si
 
+1:
 	/* Get (C)HS geometry */
-	movb	$0x08, %ah
 	int	$0x13
+
+	/* here we computer CHS values or just do some dummy computation for EBIOS */
 	andw	$0x3f, %cx	/* Sector count */
-	movw	%sp, %bp	/* %bp -> frame pointer: LEAVE UNCHANGED */
-	pushw	%cx		/* -2(%bp) Save sectors on the stack */
+	pushw	%cx		/* -32(%bp) Save sectors on the stack */
 	movzbw	%dh, %ax	/* dh = max head */
 	incw	%ax		/* From 0-based max to count */
 	mulw	%cx		/* Heads*sectors -> sectors per cylinder */
 
 	/* Save sectors/cylinder on the stack */
-	pushw	%dx		/* -4(%bp) High word */
-	pushw	%ax		/* -6(%bp) Low word */
+	pushw	%dx		/* -34(%bp) High word */
+	pushw	%ax		/* -36(%bp) Low word */
 
 	/* Load partition table header */
 	xorl	%eax,%eax
 	cltd
 	incw	%ax		/* %edx:%eax = 1 */
-	movw	$phdr, %bx
-	pushw	%bx		/* -8(%bp) phdr == bootsect */
-	call	read_sector
+	call	read_sector_phdr
 
 	/* Number of partition sectors */
-	/* We assume the partition table is 32K or less, and that
-	   the sector size is 512. */
-	/* Note: phdr == 6(%bp) */
+	/* We assume the partition table is 32K or less */
 	movw	(80+6)(%bp),%cx		/* NumberOfPartitionEntries */
 	movw	(84+6)(%bp),%ax		/* SizeOfPartitionEntry */
 	pushw	%ax
 	pushw	%cx
 	mulw	%cx
-	shrw	$9,%ax
+	divw	-6(%bp)	/* %dx == 0 here */
 	xchgw	%ax,%cx
 	incw	%cx
 
@@ -144,28 +152,40 @@ next:
 	pushw	%bx
 get_ptab:
 	call	read_sector
-	call	inc64
 	loopw	get_ptab
 
 	/* Find the boot partition */
-	popw	%si			/* Partition table in memory */
+	xorw	%si,%si			/* Nothing found yet */
+	popw	%di			/* Partition table in memory */
 	popw	%cx			/* NumberOfPartitionEntries */
 	popw	%ax			/* SizeOfPartitionEntry */
+
 find_part:
-	pushw	%cx
-	pushw	%si
-	addw	$16,%si
-	movw	$bootguid,%di
-	movw	$8,%cx
-	repe; cmpsw
-	popw	%si
-	popw	%cx
-	je found_part
-	addw	%ax,%si
+	/* If the PartitionTypeGUID is all zero, it's an empty slot */
+	movl	  (%di),%edx
+	orl	 4(%di),%edx
+	orl	 8(%di),%edx
+	orl	12(%di),%edx
+	jz	not_this
+	testb	$0x04,48(%di)
+	jz	not_this
+	andw	%si,%si
+	jnz	found_multiple
+	movw	%di,%si
+not_this:
+	addw	%ax,%di
 	loopw	find_part
 
+	andw	%si,%si
+	jnz	found_part
+
+missing_os:
 	call	error
-	.ascii	"Boot partition not found\r\n"
+	.ascii	"Missing OS\r\n"
+
+found_multiple:
+	call	error
+	.ascii	"Multiple active partitions\r\n"
 
 found_part:
 	xchgw	%ax,%cx		/* Set up %cx for rep movsb further down */
@@ -178,18 +198,21 @@ found_part:
 	xorl	%eax,%eax
 	movb	$0x80,%al
 	stosl
-	movb	$0xee,%al
+	movb	$0xed,%al
 	stosl
 	movl	32(%si),%eax
 	movl	36(%si),%edx
 	call	saturate_stosl		/* Partition start */
 
 	movl	40(%si),%eax
-	movl	48(%si),%edx
+	movl	44(%si),%edx
 	subl	32(%si),%eax
 	sbbl	36(%si),%edx
 	call	inc64
 	call	saturate_stosl		/* Partition length */
+
+	movzwl	%cx,%eax		/* Length of GPT entry */
+	stosl
 
 	rep; movsb			/* GPT entry follows MBR entry */
 	popw	%si
@@ -200,11 +223,10 @@ found_part:
  * is phdr == 0x7c00 == the address of the boot sector.
  */
 boot:
-	movl	(32+16)(%si),%eax
-	movl	(36+16)(%si),%edx
-	popw	%bx
-	call	read_sector
-	cmpw	$0xaa55, -2(%bx)
+	movl	(32+20)(%si),%eax
+	movl	(36+20)(%si),%edx
+	call	read_sector_phdr
+	cmpw	$0xaa55, (0x7c00+0x1fe)
 	jne	missing_os	/* Not a valid boot sector */
 	movw	%bp, %sp	/* driveno == bootsec-6 */
 	popw	%dx		/* dl -> drive number */
@@ -214,27 +236,26 @@ boot:
 	cli
 	jmpw	*%sp		/* %sp == bootsec */
 
-missing_os:
-	call	error
-	.ascii	"OS not bootable\r\n"
-
+/*
+ * Store the value in %eax to %di iff %edx == 0, otherwise store -1.
+ * Returns the value that was actually written in %eax.
+ */
 saturate_stosl:
-	pushl	%eax
 	andl	%edx,%edx
 	jz 1f
 	orl	$-1,%eax
 1:	stosl
-	popl	%eax
 	ret
 
-inc64:
-	addl	$1,%eax
-	adcl	$0,%edx
-	ret
+read_sector_phdr:
+	movw	$phdr, %bx
+
+	/* fall through and read sector */
 
 /*
  * read_sector: read a single sector pointed to by %edx:%eax to
  * %es:%bx.  CF is set on error.  All registers saved.
+ * %edx:%eax and %es:%bx are incremented to read next sector
  */
 read_sector:
 	pushal
@@ -249,12 +270,12 @@ read_sector:
 	/* This chunk is skipped if we have ebios */
 	/* Do not clobber %es:%bx or %edx:%eax before this chunk! */
 read_sector_cbios:
-	divl	-6(%bp)	/* secpercyl */
+	divl	-36(%bp)	/* secpercyl */
 	shlb	$6, %ah
 	movb	%ah, %cl
 	movb	%al, %ch
 	xchgw	%dx, %ax
-	divb	-2(%bp)	/* sectors */
+	divb	-32(%bp)	/* sectors */
 	movb	%al, %dh
 	orb	%ah, %cl
 	incw	%cx	/* Sectors are 1-based */
@@ -266,12 +287,21 @@ read_common:
 	leaw	16(%si), %sp	/* Drop DAPA */
 	popal
 	jc	disk_error
-	addb	$2, %bh		/* bx += 512: point to the next buffer */
+	addb	-5(%bp), %bh		/* bx += sector size: point to the next buffer */
+
+	/* fall through and increment sector number */
+
+/*
+ * Increment %edx:%eax
+ */
+inc64:
+	addl	$1,%eax
+	adcl	$0,%edx
 	ret
 
 disk_error:
 	call	error
-	.ascii	"Disk error on boot\r\n"
+	.ascii	"Disk error\r\n"
 
 /*
  * Print error messages.  This is invoked with "call", with the

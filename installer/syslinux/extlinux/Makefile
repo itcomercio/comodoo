@@ -11,27 +11,33 @@
 ## -----------------------------------------------------------------------
 
 ##
-## Linux ext2/ext3 installer
+## Linux vfat, ntfs, ext2/ext3/ext4 and btrfs installer
 ##
 
-topdir = ..
-include $(topdir)/MCONFIG
+include $(MAKEDIR)/syslinux.mk
 
 OPTFLAGS = -g -Os
-INCLUDES = -I. -I.. -I../libinstaller
+INCLUDES = -I$(SRC) -I$(objdir) -I$(SRC)/../libinstaller
 CFLAGS	 = $(GCCWARN) -Wno-sign-compare -D_FILE_OFFSET_BITS=64 \
 	   $(OPTFLAGS) $(INCLUDES)
-LDFLAGS	 = # -s
+LDFLAGS	 = 
 
 SRCS     = main.c \
+	   mountinfo.c \
+	   ../libinstaller/syslxmod.c \
+	   ../libinstaller/syslxopt.c \
+	   ../libinstaller/syslxcom.c \
+	   ../libinstaller/syslxrw.c \
 	   ../libinstaller/setadv.c \
-	   ../libinstaller/extlinux_bss_bin.c \
-	   ../libinstaller/extlinux_sys_bin.c
+	   ../libinstaller/advio.c \
+	   ../libinstaller/bootsect_bin.c \
+	   ../libinstaller/ldlinuxc32_bin.c \
+	   ../libinstaller/ldlinux_bin.c
 OBJS	 = $(patsubst %.c,%.o,$(notdir $(SRCS)))
 
 .SUFFIXES: .c .o .i .s .S
 
-VPATH = .:../libinstaller
+VPATH = $(SRC):$(SRC)/../libinstaller:$(OBJ)/../libinstaller
 
 all: installer
 
@@ -49,6 +55,9 @@ installer: extlinux
 extlinux: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
+strip:
+	$(STRIP) extlinux
+
 %.o: %.c
 	$(CC) $(UMAKEDEPS) $(CFLAGS) -c -o $@ $<
 %.i: %.c
@@ -56,4 +65,4 @@ extlinux: $(OBJS)
 %.s: %.c
 	$(CC) $(UMAKEDEPS) $(CFLAGS) -S -o $@ $<
 
--include .*.d *.tmp
+-include .*.d

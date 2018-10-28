@@ -1,6 +1,0 @@
-#define VERSION 3.85
-#define VERSION_STR "3.85"
-#define VERSION_MAJOR 3
-#define VERSION_MINOR 85
-#define YEAR 2010
-#define YEAR_STR "2010"

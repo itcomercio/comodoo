@@ -78,6 +78,7 @@ keywd_table:
 		keyword noescape,	pc_setint16,	NoEscape
 		keyword nocomplete,	pc_setint16,	NoComplete
 		keyword nohalt,		pc_setint16,	NoHalt
+		keyword pxeretry,	pc_setint16,	PXERetry
 		keyword f1,		pc_filename,	FKeyN(1)
 		keyword f2,		pc_filename,	FKeyN(2)
 		keyword f3,		pc_filename,	FKeyN(3)
@@ -91,11 +92,11 @@ keywd_table:
 		keyword f0,		pc_filename,	FKeyN(10)
 		keyword f11,		pc_filename,	FKeyN(11)
 		keyword f12,		pc_filename,	FKeyN(12)
-%if IS_PXELINUX
-		keyword ipappend,	pc_ipappend
-%endif
-%if HAS_LOCALBOOT
+		keyword ipappend,	pc_sysappend
+		keyword sysappend,	pc_sysappend
 		keyword localboot,	pc_localboot
+%if IS_PXELINUX
+		keyword sendcookies,	pc_sendcookies
 %endif
 
 keywd_count	equ ($-keywd_table)/keywd_size

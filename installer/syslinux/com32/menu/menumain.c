@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 2004-2008 H. Peter Anvin - All Rights Reserved
- *   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
+ *   Copyright 2009-2014 Intel Corporation; author: H. Peter Anvin
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -28,7 +28,9 @@
 #include <setjmp.h>
 #include <limits.h>
 #include <com32.h>
+#include <core.h>
 #include <syslinux/adv.h>
+#include <syslinux/boot.h>
 
 #include "menu.h"
 
@@ -228,7 +230,7 @@ static int ask_passwd(const char *menu_entry)
     for (x = 2; x <= WIDTH - 2 * PASSWD_MARGIN - 1; x++)
 	putchar('q');
 
-    printf("j\017\033[%d;%dH\2#12 %s \033[%d;%dH\2#13",
+    printf("j\017\033[%d;%zdH\2#12 %s \033[%d;%dH\2#13",
 	   PASSWD_ROW, (WIDTH - (strlen(cm->messages[MSG_PASSPROMPT]) + 2)) / 2,
 	   cm->messages[MSG_PASSPROMPT], PASSWD_ROW + 1, PASSWD_MARGIN + 3);
 
@@ -446,7 +448,7 @@ static const char *edit_cmdline(const char *input, int top)
     int key, len, prev_len, cursor;
     int redraw = 1;		/* We enter with the menu already drawn */
 
-    strncpy(cmdline, input, MAX_CMDLINE_LEN);
+    strlcpy(cmdline, input, MAX_CMDLINE_LEN);
     cmdline[MAX_CMDLINE_LEN - 1] = '\0';
 
     len = cursor = strlen(cmdline);
@@ -607,13 +609,6 @@ static const char *edit_cmdline(const char *input, int top)
     }
 }
 
-static inline int shift_is_held(void)
-{
-    uint8_t shift_bits = *(uint8_t *) 0x417;
-
-    return !!(shift_bits & 0x5d);	/* Caps/Scroll/Alt/Shift */
-}
-
 static void print_timeout_message(int tol, int row, const char *msg)
 {
     static int last_msg_len = 0;
@@ -726,8 +721,11 @@ static const char *do_hidden_menu(void)
 	    this_timeout = min(timeout_left, CLK_TCK);
 	    key = mygetkey(this_timeout);
 
-	    if (key != KEY_NONE)
-		return NULL;	/* Key pressed */
+	    if (key != KEY_NONE) {
+		/* Clear the message from the screen */
+		print_timeout_message(0, HIDDEN_ROW, "");
+		return hide_key[key]; /* NULL if no MENU HIDEKEY in effect */
+	    }
 
 	    timeout_left -= this_timeout;
 	}
@@ -754,6 +752,7 @@ static const char *run_menu(void)
     const char *cmdline = NULL;
     volatile clock_t key_timeout, timeout_left, this_timeout;
     const struct menu_entry *me;
+    bool hotkey = false;
 
     /* Note: for both key_timeout and timeout == 0 means no limit */
     timeout_left = key_timeout = cm->timeout;
@@ -802,7 +801,7 @@ static const char *run_menu(void)
 	    while (entry < cm->nentries && is_disabled(cm->menu_entries[entry]))
 		entry++;
 	}
-	if (entry >= cm->nentries) {
+	if (entry >= cm->nentries - 1) {
 	    entry = cm->nentries - 1;
 	    while (entry > 0 && is_disabled(cm->menu_entries[entry]))
 		entry--;
@@ -853,14 +852,22 @@ static const char *run_menu(void)
 	    to_clear = 0;
 	}
 
-	this_timeout = min(min(key_timeout, timeout_left), (clock_t) CLK_TCK);
-	key = mygetkey(this_timeout);
+	if (hotkey && me->immediate) {
+	    /* If the hotkey was flagged immediate, simulate pressing ENTER */
+	    key = KEY_ENTER;
+	} else {
+	    this_timeout = min(min(key_timeout, timeout_left),
+			       (clock_t) CLK_TCK);
+	    key = mygetkey(this_timeout);
 
-	if (key != KEY_NONE) {
-	    timeout_left = key_timeout;
-	    if (to_clear)
-		printf("\033[%d;1H\1#0\033[K", TIMEOUT_ROW);
+	    if (key != KEY_NONE) {
+		timeout_left = key_timeout;
+		if (to_clear)
+		    printf("\033[%d;1H\1#0\033[K", TIMEOUT_ROW);
+	    }
 	}
+
+	hotkey = false;
 
 	switch (key) {
 	case KEY_NONE:		/* Timeout */
@@ -911,6 +918,13 @@ static const char *run_menu(void)
 		    done = 1;
 		    clear = 1;
 		    draw_row(entry - top + 4 + VSHIFT, -1, top, 0, 0);
+		    break;
+		case MA_HELP:
+		    key = show_message_file(me->cmdline, me->background);
+		    /* If the exit was an F-key, display that help screen */
+		    show_fkey(key);
+		    done = 0;
+		    clear = 1;
 		    break;
 		default:
 		    done = 0;
@@ -1072,6 +1086,7 @@ static const char *run_menu(void)
 		    key_timeout = 0;
 		    entry = cm->menu_hotkeys[key]->entry;
 		    /* Should we commit at this point? */
+		    hotkey = true;
 		}
 	    }
 	    break;
@@ -1137,9 +1152,13 @@ int main(int argc, char *argv[])
 	printf("\033[?25h\033[%d;1H\033[0m", END_ROW);
 
 	if (cmdline) {
-	    execute(cmdline, KT_NONE);
-	    if (cm->onerror)
-		execute(cm->onerror, KT_NONE);
+	    uint32_t type = parse_image_type(cmdline);
+
+	    execute(cmdline, type, false);
+	    if (cm->onerror) {
+		type = parse_image_type(cm->onerror);
+		execute(cm->onerror, type, true);
+	    }
 	} else {
 	    return 0;		/* Exit */
 	}

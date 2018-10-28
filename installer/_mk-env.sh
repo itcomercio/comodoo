@@ -45,7 +45,9 @@ policycoreutils \
 genisoimage \
 python2-dbus \
 python2-pyparted \
-udisks2
+udisks2 \
+nasm \
+xorriso
 
 echo_note "OK" "Packages installed!"
 

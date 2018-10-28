@@ -34,32 +34,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslinux/boot.h>
-#include <com32.h>
+#include <syslinux/config.h>
+#include <core.h>
 
 void syslinux_run_kernel_image(const char *filename, const char *cmdline,
 			       uint32_t ipappend_flags, uint32_t type)
 {
-    static com32sys_t ireg;
-    char *bbfilename, *bbcmdline, *bbptr;
-    int bytes;
+    char *bbcmdline  = NULL;
+    size_t len;
+    int rv;
 
-    bbptr = __com32.cs_bounce;
+    /* +2 for NULL and space */
+    len = strlen(filename) + strlen(cmdline) + 2;
+    bbcmdline = malloc(len);
+    if (!bbcmdline)
+	return;
 
-    bytes = strlen(filename) + 1;
-    memcpy(bbfilename = bbptr, filename, bytes);
-    bbptr += bytes;
+    rv = snprintf(bbcmdline, len, "%s %s", filename, cmdline);
+    if (rv == -1 || (size_t)rv >= len)
+	return;
 
-    bytes = strlen(cmdline) + 1;
-    memcpy(bbcmdline = bbptr, filename, bytes);
-    bbptr += bytes;
-
-    ireg.eax.w[0] = 0x0016;
-    ireg.ds = SEG(bbfilename);
-    ireg.esi.w[0] = OFFS(bbfilename);
-    ireg.es = SEG(bbcmdline);
-    ireg.ebx.w[0] = OFFS(bbcmdline);
-    ireg.ecx.l = ipappend_flags;
-    ireg.edx.l = type;
-
-    __intcall(0x22, &ireg, 0);
+    SysAppends = ipappend_flags;
+    execute(bbcmdline, type, true);
 }

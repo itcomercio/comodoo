@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 2007-2008 H. Peter Anvin - All Rights Reserved
- *   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+ *   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
  *
  *   Permission is hereby granted, free of charge, to any person
  *   obtaining a copy of this software and associated documentation
@@ -34,6 +34,7 @@
 
 #ifndef MBOOT_H
 
+#include <dprintf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -45,21 +46,16 @@
 #include <minmax.h>
 #include <sys/stat.h>
 #include <elf.h>
+#include <sys/elf64.h>
 #include <console.h>
 
 #include <syslinux/loadfile.h>
 #include <syslinux/movebits.h>
 #include <syslinux/bootpm.h>
+#include <syslinux/config.h>
 
 #include "mb_header.h"
 #include "mb_info.h"
-
-#define DEBUG 0
-#if DEBUG
-# define dprintf printf
-#else
-# define dprintf(f, ...) ((void)0)
-#endif
 
 static inline void error(const char *msg)
 {
@@ -72,7 +68,7 @@ extern struct syslinux_pm_regs regs;
 extern struct my_options {
     bool solaris;
     bool aout;
-} opt;
+} opt, set;
 
 /* map.c */
 #define MAP_HIGH	1
@@ -90,7 +86,11 @@ void mboot_make_memmap(void);
 void mboot_apm(void);
 
 /* solaris.c */
+bool kernel_is_solaris(const Elf32_Ehdr *);
 void mboot_solaris_dhcp_hack(void);
+
+/* syslinux.c */
+void mboot_syslinux_info(void);
 
 /* initvesa.c */
 void set_graphics_mode(const struct multiboot_header *mbh,

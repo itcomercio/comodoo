@@ -39,24 +39,11 @@
 #include <sys/pci.h>
 #include <com32.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <syslinux/zio.h>
-
-#ifdef DEBUG
-# define dprintf printf
-#else
-# define dprintf(...) ((void)0)
-#endif
+#include <dprintf.h>
 
 #define MAX_LINE 512
-
-/* searching the next char that is not a space */
-static char *skipspace(char *p)
-{
-    while (*p && *p <= ' ')
-	p++;
-
-    return p;
-}
 
 /* removing any \n found in a string */
 static void remove_eol(char *string)
@@ -72,15 +59,6 @@ static void remove_eol(char *string)
 static int hex_to_int(char *hexa)
 {
     return strtoul(hexa, NULL, 16);
-}
-
-/* Replace char 'old' by char 'new' in source */
-void chr_replace(char *source, char old, char new) 
-{
-    while (*source) { 
-	source++;
-	if (source[0] == old) source[0]=new;
-    }
 }
 
 /* Try to match any pci device to the appropriate kernel module */
@@ -143,7 +121,7 @@ int get_module_name_from_pcimap(struct pci_domain *domain,
 	  * in the module name whereas modules.alias is only using '_'.
 	  * To avoid kernel modules duplication, let's rename all '-' in '_' 
 	  * to match what modules.alias provides */
-	 case 0:chr_replace(result,'-','_');strcpy(module_name,result); break;
+	 case 0:chrreplace(result,'-','_');strcpy(module_name,result); break;
 	 case 1:strcpy(vendor_id,result); break;
 	 case 2:strcpy(product_id,result); break;
 	 case 3:strcpy(sub_vendor_id,result); break;
@@ -601,14 +579,14 @@ void free_pci_domain(struct pci_domain *domain)
 				    free(func->dev_info);
 				free(func);
 			    }
-			    free(slot);
 			}
+			free(slot);
 		    }
-		    free(bus);
 		}
+		free(bus);
 	    }
-	    free(domain);
 	}
+	free(domain);
     }
 }
 
@@ -625,6 +603,7 @@ int get_module_name_from_alias(struct pci_domain *domain, char *modules_alias_pa
   char sub_product_id[16];
   FILE *f;
   struct pci_device *dev=NULL;
+  int valid_lines=0;
 
   /* Intializing the linux_kernel_module for each pci device to "unknown" */
   /* adding a dev_info member if needed */
@@ -652,6 +631,7 @@ int get_module_name_from_alias(struct pci_domain *domain, char *modules_alias_pa
     if ((line[0] == '#') || (strstr(line,"alias pci:v")==NULL))
         continue;
 
+    valid_lines++;
     /* Resetting temp buffer*/
     memset(module_name,0,sizeof(module_name));
     memset(vendor_id,0,sizeof(vendor_id));
@@ -676,28 +656,28 @@ int get_module_name_from_alias(struct pci_domain *domain, char *modules_alias_pa
 		/* Searching for the vendor separator*/
 		char *temp = strstr(result,"d");
 		if (temp != NULL) {
-			strncpy(vendor_id,result,temp-result);
+			strlcpy(vendor_id,result,temp-result);
 			result+=strlen(vendor_id)+1;
 		}
 
 		/* Searching for the product separator*/
 		temp = strstr(result,"sv");
 		if (temp != NULL) {
-			strncpy(product_id,result,temp-result);
+			strlcpy(product_id,result,temp-result);
 			result+=strlen(product_id)+1;
 		}
 
 		/* Searching for the sub vendor separator*/
 		temp = strstr(result,"sd");
 		if (temp != NULL) {
-			strncpy(sub_vendor_id,result,temp-result);
+			strlcpy(sub_vendor_id,result,temp-result);
 			result+=strlen(sub_vendor_id)+1;
 		}
 
 		/* Searching for the sub product separator*/
 		temp = strstr(result,"bc");
 		if (temp != NULL) {
-			strncpy(sub_product_id,result,temp-result);
+			strlcpy(sub_product_id,result,temp-result);
 			result+=strlen(sub_product_id)+1;
 		}
 	/* That's the module name */
@@ -747,5 +727,11 @@ int get_module_name_from_alias(struct pci_domain *domain, char *modules_alias_pa
     }
   }
   fclose(f);
+  /* If no valid line was found in the module.alias,
+   * we shall report it as broken/empty/non-existing */
+  if (valid_lines == 0) {
+    return -ENOMODULESALIAS;
+  }
+
   return 0;
 }

@@ -34,19 +34,13 @@
 #include <errno.h>
 #include <com32.h>
 #include <string.h>
+#include <fs.h>
 #include "file.h"
 
 int __file_close(struct file_info *fp)
 {
-    com32sys_t regs;
-
-    if (fp->i.filedes) {
-	memset(&regs, 0, sizeof regs);
-	regs.eax.w[0] = 0x0008;	/* Close file */
-	regs.esi.w[0] = fp->i.filedes;
-
-	__com32.cs_intcall(0x22, &regs, NULL);
-    }
+    if (fp->i.fd.handle)
+	close_file(fp->i.fd.handle);
 
     return 0;
 }

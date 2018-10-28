@@ -17,64 +17,55 @@
 
 NOGPL := 1
 
-# This must be defined before MCONFIG is included
-LIBS   = libmenu/libmenu.a
+LIBS  = libmenu/libmenu.c32 \
+        $(objdir)/com32/libutil/libutil.c32 \
+        $(objdir)/com32/lib/libcom32.c32
 
-topdir = ../..
-include ../MCONFIG
+C_LIBS	  = libmenu/libmenu.c32
 
-CFLAGS	  += -I./libmenu
+VPATH = $(SRC)
+include $(MAKEDIR)/elf.mk
+
+CFLAGS	  += -I$(SRC)/libmenu
 
 LIBMENU = libmenu/syslnx.o libmenu/com32io.o libmenu/tui.o \
-	libmenu/menu.o libmenu/passwords.o libmenu/des.o libmenu/help.o
+	libmenu/menu.o libmenu/passwords.o libmenu/des.o libmenu/help.o \
+	$(objdir)/com32/libutil/libutil.c32 $(objdir)/com32/lib/libcom32.c32
 
-CMENUS = $(patsubst %.c,%.c32,$(wildcard *.c))
-IMENUS = $(patsubst %.menu,%.c32,$(wildcard *.menu))
+CMENUS = $(patsubst %.c,%.c32,$(sort $(wildcard $(SRC)/*.c)))
+IMENUS = $(patsubst %.menu,%.c32,$(sort $(wildcard $(SRC)/*.menu)))
 
-MENUS = $(CMENUS) $(IMENUS)
+MENUS = $(LIBS) $(subst $(SRC)/,,$(CMENUS) $(IMENUS))
 
 .SUFFIXES: .S .c .o .elf .c32 .menu
 
 .PRECIOUS: %.c
 %.c: %.menu adv_menu.tpl
-	python menugen.py --input=$< --output=$@ --template=adv_menu.tpl
+	$(PYTHON) $(SRC)/menugen.py --input=$< --output=$@ --template=$(SRC)/adv_menu.tpl
 
-.PRECIOUS: %.o
-%.o: %.S
-	$(CC) $(MAKEDEPS) $(SFLAGS) -c -o $@ $<
+all:	makeoutputdirs menus
 
-.PRECIOUS: %.o
-%.o: %.c %.h
-	$(CC) $(MAKEDEPS) $(CFLAGS) -c -o $@ $<
+makeoutputdirs:
+	@mkdir -p $(OBJ)/libmenu
 
-.PRECIOUS: %.elf
-%.elf: %.o libmenu/libmenu.a $(LIBS)
-	$(LD) $(LDFLAGS) -o $@ $^
-
-%.c32: %.elf
-	$(OBJCOPY) -O binary $< $@
-
-all: menus
-
-libmenu/libmenu.a: $(LIBMENU)
-	-rm -f $@
-	$(AR) cq $@ $^
-	$(RANLIB) $@
+libmenu/libmenu.elf: $(LIBMENU)
+	$(LD) -shared $(LDFLAGS) -soname $(patsubst %.elf,%.c32,$(@F)) \
+		-o $@ $^
 
 tidy dist:
-	rm -f *.o *.lo *.a *.lst *.elf .*.d */.*.d
+	rm -f *.o *.lo *.lst *.elf */*.o */*.elf .*.d */.*.d
 
 libclean:
-	rm -f libmenu/*.o libmenu/*.a
+	rm -f libmenu/*.c32
 
-clean: tidy menuclean libclean
-	rm -f *.lss *.c32 *.com
+clean: tidy menuclean
+	rm -f *.lss *.com
 
 menuclean:
-	rm -f $(patsubst %.menu,%.c,$(wildcard *.menu))
+	rm -f $(patsubst %.menu,%.c,$(sort $(wildcard *.menu)))
 
 spotless: clean libclean menuclean
-	rm -f *~ \#*
+	rm -f *~ \#* *.c32
 
 menus: $(MENUS)
 

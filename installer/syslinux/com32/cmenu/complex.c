@@ -14,7 +14,7 @@
 #define NULL ((void *) 0)
 #endif
 
-#include "menu.h"
+#include "cmenu.h"
 #include "com32io.h"
 #include "help.h"
 #include "passwords.h"
@@ -92,13 +92,15 @@ void keys_handler(t_menusystem * ms __attribute__ (( unused )), t_menuitem * mi,
     }
 }
 
-t_handler_return login_handler(t_menuitem * mi)
+t_handler_return login_handler(t_menusystem * ms, t_menuitem * mi)
 {
     (void)mi;			// Unused
     char pwd[40];
     char login[40];
     int nc, nr;
     t_handler_return rv;
+
+    (void)ms;
 
     if (mi->item == loginstr) {	/* User wants to login */
     if (getscreensize(1, &nr, &nc)) {
@@ -138,6 +140,7 @@ t_handler_return login_handler(t_menuitem * mi)
     }
     rv.valid = 0;
     rv.refresh = 1;
+    rv.reserved = 0;
     return rv;
 }
 
@@ -241,6 +244,7 @@ t_handler_return checkbox_handler(t_menusystem * ms, t_menuitem * mi)
 
     rv.valid = 0;
     rv.refresh = 1;
+    rv.reserved = 0;
     return rv;
 }
 

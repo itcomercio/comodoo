@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 2004-2009 H. Peter Anvin - All Rights Reserved
- *   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
+ *   Copyright 2009-2011 Intel Corporation; author: H. Peter Anvin
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <minmax.h>
 #include <alloca.h>
 #include <inttypes.h>
@@ -36,6 +37,7 @@ int shiftkey = 0;		/* Only display menu if shift key pressed */
 int hiddenmenu = 0;
 int clearmenu = 0;
 long long totaltimeout = 0;
+const char *hide_key[KEY_MAX];
 
 /* Keep track of global default */
 static int has_ui = 0;		/* DEFAULT only counts if UI is found */
@@ -60,7 +62,7 @@ static const struct messages messages[MSG_COUNT] = {
                       __p; })
 
 /* Must match enum kernel_type */
-const char *const kernel_types[] = {
+static const char *const kernel_types[] = {
     "none",
     "localboot",
     "kernel",
@@ -91,14 +93,6 @@ static struct menu *find_menu(const char *label)
 }
 
 #define MAX_LINE 4096
-
-static char *skipspace(char *p)
-{
-    while (*p && my_isspace(*p))
-	p++;
-
-    return p;
-}
 
 /* Strip ^ from a string, returning a new reference to the same refstring
    if none present */
@@ -148,6 +142,22 @@ static char *looking_at(char *line, const char *kwd)
     return my_isspace(*p) ? p : NULL;	/* Must be EOL or whitespace */
 }
 
+/* Get a single word into a new refstr; advances the input pointer */
+static char *get_word(char *str, char **word)
+{
+    char *p = str;
+    char *q;
+
+    while (*p && !my_isspace(*p))
+	p++;
+
+    *word = q = refstr_alloc(p - str);
+    memcpy(q, str, p - str);
+    /* refstr_alloc() already inserted a terminating NUL */
+
+    return p;
+}
+
 static struct menu *new_menu(struct menu *parent,
 			     struct menu_entry *parent_entry, const char *label)
 {
@@ -172,6 +182,7 @@ static struct menu *new_menu(struct menu *parent,
 	m->allowedit = parent->allowedit;
 	m->timeout = parent->timeout;
 	m->save = parent->save;
+	m->immediate = parent->immediate;
 
 	m->ontimeout = refstr_get(parent->ontimeout);
 	m->onerror = refstr_get(parent->onerror);
@@ -219,6 +230,7 @@ struct labeldata {
     unsigned int menuindent;
     enum menu_action action;
     int save;
+    int immediate;
     struct menu *submenu;
 };
 
@@ -276,6 +288,31 @@ static void consider_for_hotkey(struct menu *m, struct menu_entry *me)
     }
 }
 
+/*
+ * Copy a string, converting whitespace characters to underscores
+ * and compacting them.  Return a pointer to the final null.
+ */
+static char *copy_sysappend_string(char *dst, const char *src)
+{
+    bool was_space = true;	/* Kill leading whitespace */
+    char *end = dst;
+    char c;
+
+    while ((c = *src++)) {
+	if (my_isspace(c)) {
+	    if (!was_space)
+		*dst++ = '_';
+	    was_space = true;
+	} else {
+	    *dst++ = c;
+	    end = dst;
+	    was_space = false;
+	}
+    }
+    *end = '\0';
+    return end;
+}
+
 static void record(struct menu *m, struct labeldata *ld, const char *append)
 {
     int i;
@@ -304,6 +341,7 @@ static void record(struct menu *m, struct labeldata *ld, const char *append)
 	me->hotkey = 0;
 	me->action = ld->action ? ld->action : MA_CMD;
 	me->save = ld->save ? (ld->save > 0) : m->save;
+	me->immediate = ld->immediate ? (ld->immediate > 0) : m->immediate;
 
 	if (ld->menuindent) {
 	    const char *dn;
@@ -340,8 +378,11 @@ static void record(struct menu *m, struct labeldata *ld, const char *append)
 	    if (ld->ipappend) {
 		ipappend = syslinux_ipappend_strings();
 		for (i = 0; i < ipappend->count; i++) {
-		    if ((ld->ipappend & (1U << i)) && ipappend->ptr[i])
-			ipp += sprintf(ipp, " %s", ipappend->ptr[i]);
+		    if ((ld->ipappend & (1U << i)) &&
+			ipappend->ptr[i] && ipappend->ptr[i][0]) {
+			*ipp++ = ' ';
+			ipp = copy_sysappend_string(ipp, ipappend->ptr[i]);
+		    }
 		}
 	    }
 
@@ -369,11 +410,18 @@ static void record(struct menu *m, struct labeldata *ld, const char *append)
 	    me->submenu = ld->submenu;
 	    break;
 
+	case MA_HELP:
+	    me->cmdline = refstr_get(ld->kernel);
+	    me->background = refstr_get(ld->append);
+	    break;
+
 	default:
 	    break;
 	}
 
-	if (ld->menudefault && me->action == MA_CMD)
+	if (ld->menudefault && (me->action == MA_CMD ||
+				me->action == MA_GOTO ||
+				me->action == MA_GOTO_UNRES))
 	    m->defentry = m->nentries - 1;
     }
 
@@ -603,9 +651,9 @@ static char *is_fkey(char *cmdstr, int *fkeyno)
 static void parse_config_file(FILE * f)
 {
     char line[MAX_LINE], *p, *ep, ch;
-    enum kernel_type type;
-    enum message_number msgnr;
-    int fkeyno;
+    enum kernel_type type = -1;
+    enum message_number msgnr = -1;
+    int fkeyno = 0;
     struct menu *m = current_menu;
 
     while (fgets(line, sizeof line, f)) {
@@ -674,6 +722,16 @@ static void parse_config_file(FILE * f)
 		    ld.save = -1;
 		else
 		    m->save = false;
+	    } else if (looking_at(p, "immediate")) {
+		if (ld.label)
+		    ld.immediate = 1;
+		else
+		    m->immediate = true;
+	    } else if (looking_at(p, "noimmediate")) {
+		if (ld.label)
+		    ld.immediate = -1;
+		else
+		    m->immediate = false;
 	    } else if (looking_at(p, "onerror")) {
 		refstr_put(m->onerror);
 		m->onerror = refstrdup(skipspace(p + 7));
@@ -691,6 +749,28 @@ static void parse_config_file(FILE * f)
 		m->menu_background = refdup_word(&p);
 	    } else if ((ep = looking_at(p, "hidden"))) {
 		hiddenmenu = 1;
+	    } else if (looking_at(p, "hiddenkey")) {
+		char *key_name, *k, *ek;
+		const char *command;
+		int key;
+		p = get_word(skipspace(p + 9), &key_name);
+		command = refstrdup(skipspace(p));
+		k = key_name;
+		for (;;) {
+		    ek = strchr(k+1, ',');
+		    if (ek)
+			*ek = '\0';
+		    key = key_name_to_code(k);
+		    if (key >= 0) {
+			refstr_put(hide_key[key]);
+			hide_key[key] = refstr_get(command);
+		    }
+		    if (!ek)
+			break;
+		    k = ek+1;
+		}
+		refstr_put(key_name);
+		refstr_put(command);
 	    } else if ((ep = looking_at(p, "clear"))) {
 		clearmenu = 1;
 	    } else if ((ep = is_message_name(p, &msgnr))) {
@@ -821,6 +901,24 @@ static void parse_config_file(FILE * f)
 		}
 	    } else if (looking_at(p, "start")) {
 		start_menu = m;
+	    } else if (looking_at(p, "help")) {
+		if (ld.label) {
+		    ld.action = MA_HELP;
+		    p = skipspace(p + 4);
+
+		    refstr_put(ld.kernel);
+		    ld.kernel = refdup_word(&p);
+
+		    if (ld.append) {
+			refstr_put(ld.append);
+			ld.append = NULL;
+		    }
+
+		    if (*p) {
+			p = skipspace(p);
+			ld.append = refdup_word(&p); /* Background */
+		    }
+		}
 	    } else if ((ep = looking_at(p, "resolution"))) {
 		int x, y;
 		x = strtoul(ep, &ep, 0);
@@ -946,11 +1044,13 @@ do_include:
 	    m->ontimeout = refstrdup(skipspace(p + 9));
 	} else if (looking_at(p, "allowoptions")) {
 	    m->allowedit = !!atoi(skipspace(p + 12));
-	} else if (looking_at(p, "ipappend")) {
+	} else if ((ep = looking_at(p, "ipappend")) ||
+		   (ep = looking_at(p, "sysappend"))) {
+	    uint32_t s = strtoul(skipspace(ep), NULL, 0);
 	    if (ld.label)
-		ld.ipappend = atoi(skipspace(p + 8));
+		ld.ipappend = s;
 	    else
-		ipappend = atoi(skipspace(p + 8));
+		ipappend = s;
 	} else if (looking_at(p, "default")) {
 	    refstr_put(globaldefault);
 	    globaldefault = refstrdup(skipspace(p + 7));
@@ -1006,6 +1106,7 @@ void parse_configs(char **argv)
     const char *filename;
     struct menu *m;
     struct menu_entry *me;
+    int k;
 
     empty_string = refstrdup("");
 
@@ -1066,5 +1167,11 @@ void parse_configs(char **argv)
 	    m->ontimeout = unlabel(m->ontimeout);
 	if (m->onerror)
 	    m->onerror = unlabel(m->onerror);
+    }
+
+    /* Final global initialization, with all labels known */
+    for (k = 0; k < KEY_MAX; k++) {
+	if (hide_key[k])
+	    hide_key[k] = unlabel(hide_key[k]);
     }
 }

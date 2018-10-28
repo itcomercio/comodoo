@@ -36,10 +36,19 @@ int write_sectors(const struct driveinfo *drive_info, const unsigned int lba,
 		  const void *data, const int size)
 {
     com32sys_t inreg, outreg;
-    struct ebios_dapa *dapa = __com32.cs_bounce;
-    void *buf = (char *)__com32.cs_bounce + size;
+    struct ebios_dapa *dapa;
+    void *buf;
+    int rv = -1;
 
-    memcpy(buf, data, size);
+    buf = lmalloc(SECTOR * size);
+    if (!buf)
+	return -1;
+
+    dapa = lmalloc(sizeof(*dapa));
+    if (!dapa)
+	goto out;
+
+    memcpy(buf, data, SECTOR * size);
     memset(&inreg, 0, sizeof inreg);
 
     if (drive_info->ebios) {
@@ -59,7 +68,7 @@ int write_sectors(const struct driveinfo *drive_info, const unsigned int lba,
 	if (!drive_info->cbios) {	// XXX errno
 	    /* We failed to get the geometry */
 	    if (lba)
-		return -1;	/* Can only write MBR */
+		goto out;	/* Can only write MBR */
 
 	    s = 1;
 	    h = 0;
@@ -69,7 +78,7 @@ int write_sectors(const struct driveinfo *drive_info, const unsigned int lba,
 
 	// XXX errno
 	if (s > 63 || h > 256 || c > 1023)
-	    return -1;
+	    goto out;
 
 	inreg.eax.w[0] = 0x0301;	/* Write one sector */
 	inreg.ecx.b[1] = c & 0xff;
@@ -82,10 +91,13 @@ int write_sectors(const struct driveinfo *drive_info, const unsigned int lba,
 
     /* Perform the write */
     if (int13_retry(&inreg, &outreg)) {
-	errno_disk = outreg.eax.b[1];
-	return -1;		/* Give up */
+	errno_disk = outreg.eax.b[1];	/* Give up */
     } else
-	return size;
+	rv = size;
+out:
+    lfree(dapa);
+    lfree(buf);
+    return rv;
 }
 
 /**
@@ -111,7 +123,7 @@ int write_verify_sectors(struct driveinfo *drive_info,
 			 const unsigned int lba,
 			 const void *data, const int size)
 {
-    char *rb = malloc(SECTOR * size * sizeof(char));
+    char *rb = malloc(SECTOR * size);
     int status;
 
     if (write_sectors(drive_info, lba, data, size) == -1)

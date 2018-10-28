@@ -61,45 +61,86 @@ void detect_parameters(const int argc, const char *argv[],
 		       struct s_hardware *hardware)
 {
     /* Quiet mode - make the output more quiet */
-    quiet = false;
+    quiet = true;
+
+    /* Silent mode - make not output at all */
+    silent = false;
 
     /* Vesa mode isn't set until we explictly call it */
     vesamode = false;
 
+    /* Automode isn't the default*/
+    automode = false;
+
+    /* Menu mode is the default*/
+    menumode = true;
+
     for (int i = 1; i < argc; i++) {
 	if (!strncmp(argv[i], "quiet", 5)) {
 	    quiet = true;
+	} else if (!strncmp(argv[i], "silent", 6)) {
+	    silent = true;
+	} else	if (!strncmp(argv[i], "verbose", 7)) {
+	    quiet = false;
 	} else if (!strncmp(argv[i], "modules_pcimap=", 15)) {
-	    strncpy(hardware->modules_pcimap_path, argv[i] + 15,
+	    strlcpy(hardware->modules_pcimap_path, argv[i] + 15,
 		    sizeof(hardware->modules_pcimap_path));
 	    convert_isolinux_filename(hardware->modules_pcimap_path, hardware);
 	} else if (!strncmp(argv[i], "pciids=", 7)) {
-	    strncpy(hardware->pciids_path, argv[i] + 7,
+	    strlcpy(hardware->pciids_path, argv[i] + 7,
 		    sizeof(hardware->pciids_path));
 	    convert_isolinux_filename(hardware->pciids_path, hardware);
 	} else if (!strncmp(argv[i], "modules_alias=", 14)) {
-	    strncpy(hardware->modules_alias_path, argv[i] + 14,
+	    strlcpy(hardware->modules_alias_path, argv[i] + 14,
 		    sizeof(hardware->modules_alias_path));
 	    convert_isolinux_filename(hardware->modules_alias_path, hardware);
 	} else if (!strncmp(argv[i], "memtest=", 8)) {
-	    strncpy(hardware->memtest_label, argv[i] + 8,
+	    strlcpy(hardware->memtest_label, argv[i] + 8,
 		    sizeof(hardware->memtest_label));
 	    convert_isolinux_filename(hardware->memtest_label, hardware);
-	} else if (!strncmp(argv[i], "reboot=", 7)) {
-	    strncpy(hardware->reboot_label, argv[i] + 7,
-		    sizeof(hardware->reboot_label));
-	    convert_isolinux_filename(hardware->reboot_label, hardware);
 	} else if (!strncmp(argv[i], "vesa", 4)) {
 	    vesamode = true;
-	    max_console_lines = MAX_CLI_LINES;
+	    max_console_lines = MAX_VESA_CLI_LINES;
 	    /* If the user defines a background image */
 	    if (!strncmp(argv[i], "vesa=", 5)) {
-		strncpy(hardware->vesa_background, argv[i] + 5,
+		strlcpy(hardware->vesa_background, argv[i] + 5,
 			sizeof(hardware->vesa_background));
 	    }
 	} else if (!strncmp(argv[i], "novesa", 6)) {
 	    vesamode = false;
-	    max_console_lines = MAX_VESA_CLI_LINES;
+	    max_console_lines = MAX_CLI_LINES;
+	} else if (!strncmp(argv[i], "nomenu", 6)) {
+	    menumode = false;
+	} else if (!strncmp(argv[i], "dump_filename=", 14)) {
+	    strlcpy(hardware->dump_filename, argv[i] + 14,
+		    sizeof(hardware->dump_filename));
+	} else if (!strncmp(argv[i], "dump_path=", 10)) {
+	    strlcpy(hardware->dump_path, argv[i] + 10,
+		    sizeof(hardware->dump_path));
+	} else if (!strncmp(argv[i], "tftp_ip=", 8)) {
+	    strlcpy(hardware->tftp_ip, argv[i] + 8,
+		    sizeof(hardware->tftp_ip));
+	} else if (!strncmp(argv[i], "postexec=", 9)) {
+	    /* The postexec= parameter is separated in several argv[]
+	     * as it can contains spaces.
+	     * We use the AUTO_DELIMITER char to define the limits
+	     * of this parameter.
+	     * i.e postexec='linux memtest.bin'
+	     */
+
+	    char *argument = (char*)argv[i]+10;
+	    /* Extracting the first parameter */
+	    strcpy(hardware->postexec, argument);
+
+	    /* While we can't find the other AUTO_DELIMITER, let's process the argv[] */
+	    while ((strchr(argument, AUTO_DELIMITER) == NULL) && (i+1<argc)) {
+		i++;
+	    	argument = (char *)argv[i];
+		strcat(hardware->postexec, " ");
+		strcat(hardware->postexec, argument);
+	    } 
+	
+	     hardware->postexec[strlen(hardware->postexec) - 1] = 0;
 	} else if (!strncmp(argv[i], "auto=", 5)) {
 	    /* The auto= parameter is separated in several argv[]
 	     * as it can contains spaces.
@@ -108,25 +149,20 @@ void detect_parameters(const int argc, const char *argv[],
 	     * i.e auto='show dmi; show pci'
 	     */
 
+	    automode=true;
+	    char *argument = (char*)argv[i]+6;
 	    /* Extracting the first parameter */
-	    strcpy(hardware->auto_label, argv[i] + 6);
-	    strcat(hardware->auto_label, " ");
-	    char *pos;
-	    i++;
+	    strcpy(hardware->auto_label, argument);
 
 	    /* While we can't find the other AUTO_DELIMITER, let's process the argv[] */
-	    while (((pos = strstr(argv[i], AUTO_DELIMITER)) == NULL)
-		   && (i < argc)) {
-		strcat(hardware->auto_label, argv[i]);
-		strcat(hardware->auto_label, " ");
+	    while ((strchr(argument, AUTO_DELIMITER) == NULL) && (i+1<argc)) {
 		i++;
-	    }
+	    	argument = (char *)argv[i];
+		strcat(hardware->auto_label, " ");
+		strcat(hardware->auto_label, argument);
+	    } 
 
-	    /* If we didn't reach the end of the line, let's grab the last item */
-	    if (i < argc) {
-		strcat(hardware->auto_label, argv[i]);
-		hardware->auto_label[strlen(hardware->auto_label) - 1] = 0;
-	    }
+	     hardware->auto_label[strlen(hardware->auto_label) - 1] = 0;
 	}
     }
 }
@@ -169,12 +205,15 @@ void init_hardware(struct s_hardware *hardware)
     hardware->vesa_detection = false;
     hardware->vpd_detection = false;
     hardware->memory_detection = false;
+    hardware->acpi_detection = false;
     hardware->nb_pci_devices = 0;
     hardware->is_dmi_valid = false;
     hardware->is_pxe_valid = false;
     hardware->is_vpd_valid = false;
+    hardware->is_acpi_valid = false;
     hardware->pci_domain = NULL;
     hardware->detected_memory_size = 0;
+    hardware->physical_cpu_count =1; /* we have at least one cpu */
 
     /* Cleaning structures */
     memset(hardware->disk_info, 0, sizeof(hardware->disk_info));
@@ -184,6 +223,7 @@ void init_hardware(struct s_hardware *hardware)
     memset(&hardware->pxe, 0, sizeof(struct s_pxe));
     memset(&hardware->vesa, 0, sizeof(struct s_vesa));
     memset(&hardware->vpd, 0, sizeof(s_vpd));
+    memset(&hardware->acpi, 0, sizeof(s_acpi));
     memset(hardware->syslinux_fs, 0, sizeof hardware->syslinux_fs);
     memset(hardware->pciids_path, 0, sizeof hardware->pciids_path);
     memset(hardware->modules_pcimap_path, 0,
@@ -191,15 +231,19 @@ void init_hardware(struct s_hardware *hardware)
     memset(hardware->modules_alias_path, 0,
 	   sizeof hardware->modules_alias_path);
     memset(hardware->memtest_label, 0, sizeof hardware->memtest_label);
-    memset(hardware->reboot_label, 0, sizeof hardware->reboot_label);
     memset(hardware->auto_label, 0, sizeof hardware->auto_label);
+    memset(hardware->dump_path, 0, sizeof hardware->dump_path);
+    memset(hardware->dump_filename, 0, sizeof hardware->dump_filename);
     memset(hardware->vesa_background, 0, sizeof hardware->vesa_background);
+    memset(hardware->tftp_ip, 0, sizeof hardware->tftp_ip);
+    memset(hardware->postexec, 0, sizeof hardware->postexec);
+    strcat(hardware->dump_path, "hdt");
+    strcat(hardware->dump_filename, "%{m}+%{p}+%{v}");
     strcat(hardware->pciids_path, "pci.ids");
     strcat(hardware->modules_pcimap_path, "modules.pcimap");
     strcat(hardware->modules_alias_path, "modules.alias");
     strcat(hardware->memtest_label, "memtest");
-    strcat(hardware->reboot_label, "reboot.c32");
-    strncpy(hardware->vesa_background, CLI_DEFAULT_BACKGROUND,
+    strlcpy(hardware->vesa_background, CLI_DEFAULT_BACKGROUND,
 	    sizeof(hardware->vesa_background));
 }
 
@@ -220,6 +264,25 @@ int detect_dmi(struct s_hardware *hardware)
     parse_dmitable(&hardware->dmi);
     hardware->is_dmi_valid = true;
     return 0;
+}
+
+/*
+ * Detecting ACPI
+ * if yes, let's parse it
+ */
+int detect_acpi(struct s_hardware *hardware)
+{
+    int retval;
+    if (hardware->acpi_detection == true)
+	return -1;
+    hardware->acpi_detection = true;
+    if ((retval=parse_acpi(&hardware->acpi)) != ACPI_FOUND) {
+	hardware->is_acpi_valid = false;
+	return retval;
+    }
+
+    hardware->is_acpi_valid = true;
+    return retval;
 }
 
 /**
@@ -254,6 +317,7 @@ int detect_vesa(struct s_hardware *hardware)
     struct vesa_mode_info *mi;
     uint16_t mode, *mode_ptr;
     char *oem_ptr;
+    int rv = -1;
 
     if (hardware->vesa_detection == true)
 	return -1;
@@ -261,27 +325,32 @@ int detect_vesa(struct s_hardware *hardware)
     hardware->vesa_detection = true;
     hardware->is_vesa_valid = false;
 
-    /* Allocate space in the bounce buffer for these structures */
-    gi = &((struct vesa_info *)__com32.cs_bounce)->gi;
-    mi = &((struct vesa_info *)__com32.cs_bounce)->mi;
+    gi = lmalloc(sizeof(*gi));
+    if (!gi)
+	return -1;
+
+    mi = lmalloc(sizeof(*mi));
+    if (!mi)
+	goto out;
 
     gi->signature = VBE2_MAGIC;	/* Get VBE2 extended data */
+    memset(&rm, 0, sizeof rm);
     rm.eax.w[0] = 0x4F00;	/* Get SVGA general information */
     rm.edi.w[0] = OFFS(gi);
     rm.es = SEG(gi);
     __intcall(0x10, &rm, &rm);
 
     if (rm.eax.w[0] != 0x004F) {
-	return -1;
+	goto out;
     };
 
     mode_ptr = GET_PTR(gi->video_mode_ptr);
     oem_ptr = GET_PTR(gi->oem_vendor_name_ptr);
-    strncpy(hardware->vesa.vendor, oem_ptr, sizeof(hardware->vesa.vendor));
+    strlcpy(hardware->vesa.vendor, oem_ptr, sizeof(hardware->vesa.vendor));
     oem_ptr = GET_PTR(gi->oem_product_name_ptr);
-    strncpy(hardware->vesa.product, oem_ptr, sizeof(hardware->vesa.product));
+    strlcpy(hardware->vesa.product, oem_ptr, sizeof(hardware->vesa.product));
     oem_ptr = GET_PTR(gi->oem_product_rev_ptr);
-    strncpy(hardware->vesa.product_revision, oem_ptr,
+    strlcpy(hardware->vesa.product_revision, oem_ptr,
 	    sizeof(hardware->vesa.product_revision));
 
     hardware->vesa.major_version = (gi->version >> 8) & 0xff;
@@ -293,6 +362,7 @@ int detect_vesa(struct s_hardware *hardware)
 
     while ((mode = *mode_ptr++) != 0xFFFF) {
 
+        memset(&rm, 0, sizeof rm);
 	rm.eax.w[0] = 0x4F01;	/* Get SVGA mode information */
 	rm.ecx.w[0] = mode;
 	rm.edi.w[0] = OFFS(mi);
@@ -311,7 +381,12 @@ int detect_vesa(struct s_hardware *hardware)
 	hardware->vesa.vmi_count++;
     }
     hardware->is_vesa_valid = true;
-    return 0;
+
+    rv = 0;
+out:
+    lfree(mi);
+    lfree(gi);
+    return rv;
 }
 
 /* Try to detect disks from port 0x80 to 0xff */
@@ -418,8 +493,6 @@ int detect_pxe(struct s_hardware *hardware)
 		return -1;
 		break;
 	    }
-	    /* Let's try to find the associated pci device */
-	    detect_pci(hardware);
 
 	    /* The firt pass try to find the exact pci device */
 	    hardware->pxe.pci_device = NULL;
@@ -521,8 +594,6 @@ void detect_pci(struct s_hardware *hardware)
 	get_module_name_from_alias(hardware->pci_domain,
 				   hardware->modules_alias_path);
 
-    /* We try to detect the pxe stuff to populate the PXE: field of pci devices */
-    detect_pxe(hardware);
 }
 
 void cpu_detect(struct s_hardware *hardware)
@@ -533,13 +604,17 @@ void cpu_detect(struct s_hardware *hardware)
     /* Old processors doesn't manage the identify commands 
      * Let's use the dmi value in that case */
     if (strlen(remove_spaces(hardware->cpu.model)) == 0)
-	strncpy(hardware->cpu.model, hardware->dmi.processor.version,
+	strlcpy(hardware->cpu.model, hardware->dmi.processor.version,
 		sizeof(hardware->cpu.model));
 
     /* Some CPUs like to put many spaces in the model name
      * That makes some weird display in console/menu
      * Let's remove that mulitple spaces */
-    strncpy(hardware->cpu.model,del_multi_spaces(hardware->cpu.model),sizeof(hardware->cpu.model));
+    strlcpy(hardware->cpu.model,del_multi_spaces(hardware->cpu.model),sizeof(hardware->cpu.model));
+
+    if ((hardware->is_acpi_valid) && (hardware->acpi.madt.valid)) {
+    	hardware->physical_cpu_count=hardware->acpi.madt.processor_local_apic_count / hardware->cpu.num_cores;
+    }
     hardware->cpu_detection = true;
 }
 
@@ -624,17 +699,14 @@ char *del_multi_spaces(char *p)
      * As we search for a double spacing
      * we have to be sure then string is
      * long enough to be processed */
-    while (*p && *p + 1) {
+    while (*p && *(p + 1)) {
 
 	/* If we have two consecutive spaces */
 	if ((*p == ' ') && (*(p + 1) == ' ')) {
 
 	    /* Let's copy to the current position
 	     * the content from the second space*/
-	    strncpy(p, p + 1, strlen(p + 1));
-
-	    /* The string is 1 char smaller */
-	    *(p + strlen(p) - 1) = '\0';
+	    strlcpy(p, p + 1, strlen(p + 1));
 
 	    /* Don't increment the pointer as we
 	     * changed the content of the current position*/
@@ -670,3 +742,51 @@ void init_console(struct s_hardware *hardware)
     } else
 	console_ansi_raw();
 }
+
+void detect_hardware(struct s_hardware *hardware)
+{
+    if (!quiet)
+        more_printf("ACPI: Detecting\n");
+    detect_acpi(hardware);
+
+    if (!quiet)
+        more_printf("MEMORY: Detecting\n");
+    detect_memory(hardware);
+
+    if (!quiet)
+        more_printf("DMI: Detecting Table\n");
+    if (detect_dmi(hardware) == -ENODMITABLE) {
+        more_printf("DMI: ERROR ! Table not found ! \n");
+        more_printf("DMI: Many hardware components will not be detected ! \n");
+    } else {
+        if (!quiet)
+            more_printf("DMI: Table found ! (version %u.%u)\n",
+                        hardware->dmi.dmitable.major_version,
+                        hardware->dmi.dmitable.minor_version);
+    }
+
+    if (!quiet)
+        more_printf("CPU: Detecting\n");
+    cpu_detect(hardware);
+
+    if (!quiet)
+        more_printf("DISKS: Detecting\n");
+    detect_disks(hardware);
+
+    if (!quiet)
+        more_printf("VPD: Detecting\n");
+    detect_vpd(hardware);
+
+    detect_pci(hardware);
+    if (!quiet)
+        more_printf("PCI: %d Devices Found\n", hardware->nb_pci_devices);
+ 
+   if (!quiet)
+        more_printf("PXE: Detecting\n");
+    detect_pxe(hardware);
+
+    if (!quiet)
+        more_printf("VESA: Detecting\n");
+    detect_vesa(hardware);
+}
+

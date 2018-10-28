@@ -39,9 +39,7 @@
 
 int main(void)
 {
-    char buffer[1024];
     s_vpd vpd;
-    openconsole(&dev_stdcon_r, &dev_stdcon_w);
 
     if (vpd_decode(&vpd) == -ENOVPDTABLE) {
 	printf("No VPD Structure found\n");

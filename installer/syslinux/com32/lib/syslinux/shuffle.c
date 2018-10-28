@@ -38,42 +38,16 @@
 #include <string.h>
 #include <inttypes.h>
 #include <com32.h>
+#include <core.h>
 #include <minmax.h>
+#include <dprintf.h>
 #include <syslinux/movebits.h>
 #include <klibc/compiler.h>
-
-#ifndef DEBUG
-# define DEBUG 0
-#endif
-
-#define dprintf(f, ...) ((void)0)
-#define dprintf2(f, ...) ((void)0)
-
-#if DEBUG
-# include <stdio.h>
-# undef dprintf
-# define dprintf printf
-# if DEBUG > 1
-#  undef dprintf2
-#  define dprintf2 printf
-# endif
-#endif
+#include <syslinux/boot.h>
 
 struct shuffle_descriptor {
     uint32_t dst, src, len;
 };
-
-static int shuffler_size;
-
-static void __constructor __syslinux_get_shuffer_size(void)
-{
-    static com32sys_t reg;
-
-    reg.eax.w[0] = 0x0023;
-    __intcall(0x22, &reg, &reg);
-
-    shuffler_size = (reg.eflags.l & EFLAGS_CF) ? 2048 : reg.ecx.w[0];
-}
 
 /*
  * Allocate descriptor memory in these chunks; if this is large we may
@@ -93,9 +67,13 @@ int syslinux_do_shuffle(struct syslinux_movelist *fraglist,
     int np;
     int desc_blocks, need_blocks;
     int need_ptrs;
-    addr_t desczone, descfree, descaddr, descoffs;
+    addr_t desczone, descfree, descaddr;
     int nmoves, nzero;
-    com32sys_t ireg;
+
+#ifndef __FIRMWARE_BIOS__
+    errno = ENOSYS;
+    return -1;			/* Not supported at this time*/
+#endif
 
     descaddr = 0;
     dp = dbuf = NULL;
@@ -139,7 +117,8 @@ int syslinux_do_shuffle(struct syslinux_movelist *fraglist,
 	   descriptor, plus the shuffler safe area. */
 	addr_t descmem = desc_blocks *
 	    sizeof(struct shuffle_descriptor) * DESC_BLOCK_SIZE
-	    + sizeof(struct shuffle_descriptor) + shuffler_size;
+	    + sizeof(struct shuffle_descriptor)
+	    + syslinux_shuffler_size();
 
 	descaddr = (desczone + descfree - descmem) & ~3;
 
@@ -151,7 +130,7 @@ int syslinux_do_shuffle(struct syslinux_movelist *fraglist,
 	    goto bail;
 
 #if DEBUG > 1
-	syslinux_dump_movelist(stdout, fraglist);
+	syslinux_dump_movelist(fraglist);
 #endif
 
 	if (syslinux_compute_movelist(&moves, fraglist, rxmap))
@@ -171,7 +150,7 @@ int syslinux_do_shuffle(struct syslinux_movelist *fraglist,
 
 #if DEBUG > 1
     dprintf("Final movelist:\n");
-    syslinux_dump_movelist(stdout, moves);
+    syslinux_dump_movelist(moves);
 #endif
 
     syslinux_free_memmap(rxmap);
@@ -182,11 +161,13 @@ int syslinux_do_shuffle(struct syslinux_movelist *fraglist,
     if (!dbuf)
 	goto bail;
 
-    descoffs = descaddr - (addr_t) dbuf;
-
 #if DEBUG
-    dprintf("nmoves = %d, nzero = %d, dbuf = %p, offs = 0x%08x\n",
-	    nmoves, nzero, dbuf, descoffs);
+    {
+	addr_t descoffs = descaddr - (addr_t) dbuf;
+
+	dprintf("nmoves = %d, nzero = %d, dbuf = %p, offs = 0x%08x\n",
+		nmoves, nzero, dbuf, descoffs);
+    }
 #endif
 
     /* Copy the move sequence into the descriptor buffer */
@@ -238,13 +219,8 @@ bail:
 	return rv;
 
     /* Actually do it... */
-    memset(&ireg, 0, sizeof ireg);
-    ireg.edi.l = descaddr;
-    ireg.esi.l = (addr_t) dbuf;
-    ireg.ecx.l = (addr_t) dp - (addr_t) dbuf;
-    ireg.edx.w[0] = bootflags;
-    ireg.eax.w[0] = 0x0024;
-    __intcall(0x22, &ireg, NULL);
+    bios_do_shuffle_and_boot(bootflags, descaddr, dbuf,
+			     (size_t)dp - (size_t)dbuf);
 
     return -1;			/* Shouldn't have returned! */
 }

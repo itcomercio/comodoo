@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <elf.h>
 #include <console.h>
+#include <dprintf.h>
 
 #include <syslinux/loadfile.h>
 #include <syslinux/movebits.h>
@@ -49,13 +50,6 @@
 
 /* If we don't have this much memory for the stack, signal failure */
 #define MIN_STACK	512
-
-#define DEBUG 0
-#if DEBUG
-# define dprintf printf
-#else
-# define dprintf(f, ...) ((void)0)
-#endif
 
 static inline void error(const char *msg)
 {
@@ -126,10 +120,8 @@ int boot_elf(void *ptr, size_t len, char **argv)
     if (!mmap || !amap)
 	goto bail;
 
-#if DEBUG
     dprintf("Initial memory map:\n");
-    syslinux_dump_memmap(stdout, mmap);
-#endif
+    syslinux_dump_memmap(mmap);
 
     ph = (Elf32_Phdr *) (cptr + eh->e_phoff);
 
@@ -191,10 +183,8 @@ int boot_elf(void *ptr, size_t len, char **argv)
     if (!stack_frame)
 	goto bail;
 
-#if DEBUG
     dprintf("Right before syslinux_memmap_largest()...\n");
-    syslinux_dump_memmap(stdout, amap);
-#endif
+    syslinux_dump_memmap(amap);
 
     if (syslinux_memmap_largest(amap, SMT_FREE, &lstart, &llen))
 	goto bail;		/* NO free memory?! */
@@ -245,16 +235,14 @@ int boot_elf(void *ptr, size_t len, char **argv)
     regs.eip = eh->e_entry;
     regs.esp = stack_pointer;
 
-#if DEBUG
     dprintf("Final memory map:\n");
-    syslinux_dump_memmap(stdout, mmap);
+    syslinux_dump_memmap(mmap);
 
     dprintf("Final available map:\n");
-    syslinux_dump_memmap(stdout, amap);
+    syslinux_dump_memmap(amap);
 
     dprintf("Movelist:\n");
-    syslinux_dump_movelist(stdout, ml);
-#endif
+    syslinux_dump_movelist(ml);
 
     /* This should not return... */
     fputs("Booting...\n", stdout);
@@ -274,8 +262,6 @@ int main(int argc, char *argv[])
 {
     void *data;
     size_t data_len;
-
-    openconsole(&dev_null_r, &dev_stdcon_w);
 
     if (argc < 2) {
 	error("Usage: elf.c32 elf_file arguments...\n");

@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <com32.h>
 #include "sysdump.h"
-#include "backend.h"
 
 #define E820_CHUNK 128
 struct e820_info {
@@ -16,12 +15,14 @@ struct e820_info {
     uint8_t  data[24];
 };
 
-static void dump_e820(struct backend *be)
+static void dump_e820(struct upload_backend *be)
 {
     com32sys_t ireg, oreg;
-    struct e820_info *curr = __com32.cs_bounce;
+    struct e820_info *curr;
     struct e820_info *buf, *p;
     int nentry, nalloc;
+
+    curr = lmalloc(sizeof *curr);
 
     buf = p = NULL;
     nentry = nalloc = 0;
@@ -56,10 +57,12 @@ static void dump_e820(struct backend *be)
 
     if (nentry)
 	cpio_writefile(be, "memmap/15e820", buf, nentry*sizeof *buf);
+
     free(buf);
+    lfree(curr);
 }
 
-void dump_memory_map(struct backend *be)
+void dump_memory_map(struct upload_backend *be)
 {
     com32sys_t ireg, oreg;
 
@@ -69,10 +72,12 @@ void dump_memory_map(struct backend *be)
     __intcall(0x12, &ireg, &oreg);
     cpio_writefile(be, "memmap/12", &oreg, sizeof oreg);
 
+    memset(&ireg, 0, sizeof ireg);
     ireg.eax.b[1] = 0x88;
     __intcall(0x15, &ireg, &oreg);
     cpio_writefile(be, "memmap/1588", &oreg, sizeof oreg);
 
+    memset(&ireg, 0, sizeof ireg);
     ireg.eax.w[0] = 0xe801;
     __intcall(0x15, &ireg, &oreg);
     cpio_writefile(be, "memmap/15e801", &oreg, sizeof oreg);

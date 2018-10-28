@@ -51,6 +51,14 @@ struct vesa_char {
     attr_t attr;		/* Color table index */
 };
 
+struct win_info {
+    char *win_base;
+    size_t win_pos;
+    size_t win_size;
+    int win_gshift;
+    int win_num;
+};
+
 /* Pixel formats in order of decreasing preference; PXF_NONE should be last */
 /* BGR24 is preferred over BGRA32 since the I/O overhead is smaller. */
 enum vesa_pixel_format {
@@ -81,7 +89,7 @@ extern const uint8_t __vesacon_linear_to_srgb[4080];
 
 int __vesacon_init_background(void);
 int vesacon_load_background(const char *);
-int __vesacon_init(int, int);
+int __vesacon_init(int *, int *);
 void __vesacon_init_cursor(int);
 void __vesacon_erase(int, int, int, int, attr_t);
 void __vesacon_scroll_up(int, attr_t);

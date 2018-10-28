@@ -165,6 +165,12 @@ void display_cpu(s_dmi * dmi)
     moreprintf("\tCache L3 Handle %s\n", dmi->processor.cache3);
     moreprintf("\tSerial       %s\n", dmi->processor.serial);
     moreprintf("\tPart Number  %s\n", dmi->processor.part_number);
+    if (dmi->processor.core_count != 0)
+        moreprintf("\tCores Count   %d\n", dmi->processor.core_count);
+    if (dmi->processor.core_enabled != 0)
+        moreprintf("\tCores Enabled %d\n", dmi->processor.core_enabled);
+    if (dmi->processor.thread_count != 0)
+        moreprintf("\tThreads Count %d\n", dmi->processor.thread_count);
     moreprintf("\tID           %s\n", dmi->processor.id);
     display_processor_flags(dmi);
 }
@@ -173,7 +179,6 @@ int main(void)
 {
     char buffer[1024];
     s_dmi dmi;
-    openconsole(&dev_stdcon_r, &dev_stdcon_w);
 
     if (dmi_iterate(&dmi) == -ENODMITABLE) {
 	printf("No DMI Structure found\n");

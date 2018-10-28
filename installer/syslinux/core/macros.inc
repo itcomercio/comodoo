@@ -31,6 +31,11 @@
 %endif
 %ifdef IS_PXELINUX
  %define MY_NAME 'PXELINUX'
+ %if IS_LPXELINUX > 0
+  %define MY_TYPE 'lwIP'
+ %else
+  %define MY_TYPE 'PXE'
+ %endif
 %else
  %define IS_PXELINUX 0
 %endif
@@ -47,7 +52,7 @@
 
 ;
 ; Macros similar to res[bwd], but which works in the code segment (after
-; section .text) or the data segment (section .data)
+; section .text16) or the data segment (section .data16)
 ;
 %macro	zb	1.nolist
 	times %1 db 0

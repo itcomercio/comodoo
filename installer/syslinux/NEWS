@@ -2,6 +2,414 @@ Starting with 1.47, changes marked with SYSLINUX, PXELINUX, ISOLINUX
 or EXTLINUX apply to that specific program only; other changes apply
 to all derivatives.
 
+Changes in 6.03:
+	* chain: Fix chainloading on 6.02 (Raphael S. Carvalho).
+	* core: Do not leak the __lowmem and __bss16 macros to modules;
+	  hide them so modules will not use them.
+	* load_linux: Do not use size heuristic for non-relocatable
+	  kernels, for zImage kernels and for non-Linux kernels.
+	* PXELINUX: Fix the SENDCOOKIES feature for HTTP
+	  (Russel Santillanes).
+	* gnu-efi: Add gnu-efi as a submodule.
+	* ANSI: Support color tables with more than 256 entries
+	  (James Buren).
+	* EFI: Fix displayed version; add DATE (Gene Cumm)
+	* PXELINUX, EFI: Fix bad read of file size over TFTP on EFI64
+	  (Sylvain Gault).
+	* Fix hand over to kernel:
+	  "Booting kernel failed: Invalid argument" error.
+	* ISOLINUX: EDX, LBA values higher than 65535; work around for
+	  buggy BIOS, where the system would hang, would reboot, or
+	  would show a "Disk error 01, AX=42" message.
+	* core/legacynet: Enable dot quad resolution (Gene Cumm).
+	* diag/geodsp improvements (Gene Cumm).
+	* DOS: Fix syslinux.com DOS-based installer.
+	* Improve gcc 4.3.0 compatibility.
+	* syslxint: fix compilation on non-x86 architectures.
+	* localboot: Fix "localboot 0x80" and similar cases.
+	* Add memset() calls prior to any intcall() and other mem fixes;
+	  specially relevant for older hardware and/or buggy BIOS.
+	* poweroff.c32: Fixes (Gene Cumm).
+	* HDT: Fix memory leak in CLI (Felipe Pena).
+	* ACPI: Remove memset of buffer; it makes things clearer but
+	  also prevents some compilation warnings (Erwan Velu).
+	* Add manpages for isohybrid, memdiskfind
+	  (Peter Jones, Gene Cumm).
+	* ISOLINUX: Experimental Rock Ridge support (Thomas Schmitt).
+	* comapi: Remove the comapi interfaces.
+	* EFI: Fixes on PE files and OVMF compatibility
+	  (Sylvain Gault, Gene Cumm).
+	* EFI: Updates and fixes for gnu-efi sub-module
+	  (Sylvain Gault, Gene Cumm).
+	* BIOS: Fix low memory check.
+	* Filesystem UUID to SYSAPPEND bit 0x40000 for FAT and ext2
+	  (Serj Kalichev).
+	* Makefiles: Export the firmware type as a cpp variable.
+	  Additional improvements. Fix "make spotless".
+	* core, BIOS: Move __syslinux_shuffler_size to assembly.
+	  Actually get the shuffler size sanely. Fix booting recent
+	  Syslinux versions on certain hardware and on certain
+	  virtualization software (e.g. QEMU 0.11.1, VirtualBox 4.1.x).
+	* lua: Upgrade to v.5.2.3 (Ferenc Wágner) and additional fixes.
+	* chainload: Fixes to chain.c32 and pxechn.c32.
+	* NTFS: Make byte_shift a constant.
+	* NTFS: Correct parsing of file runs (Andy Alex).
+	* core, BIOS: Correct detection of EDD (Andy Alex).
+	* core: Avoid initializing the cache more than once
+	  (Raphael S. Carvalho).
+	* NTFS: Handle fragmented $MFT file (Andy Alex).
+	* BIOS: Use int 0x16, ah=0x02 to probe for shift flags. Attempt
+	  workaround for USB keyboards not responding at boot time.
+	* kbd: Getting the keyboard shift state is now a firmware method.
+	* kbd: Fix force-prompt features.
+	* BTRFS: Fix booting on BTRFS.
+	* cache, btrfs: Provide a general cached read routine.
+	* NTFS: Correct file->offset usage in ntfs_readdir (Andy Alex).
+	* New support for UFS/FFS (UFS1/2) (Raphael S. Carvalho).
+	* adv: Remove double definition;
+	  it should fix uses of the ADV, including "--once".
+	* memdump: Remove old obsolete COM16 binary.
+	* isohybrid: Numerous fixes (Thomas Schmitt).
+	* chain.c32: Add an adjustable "strict={0,1,2}" flag, improve
+	  error reporting (Michal Soltys.)
+	* lpxelinux.0: Workaround for various buggy BIOSes (Gene
+	  Cumm.)
+	* PXE: Fix a stack-smashing bug which broke a large number of
+	  systems.
+
+Changes in 6.02:
+	* efi64: Add support for booting 32-bit kernels.
+	* efi: Use the EFI handover protocol when booting kernels if
+	  available.
+	* Fix various make targets that became broken when switching to
+	  per-firmware object directories, including 'make install' and
+	  'make netinstall'.
+	* efi: Improve handling of packet loss in UDP stack.
+	* tests: Introduce a new regression test framework designed to
+	  ensure bugs are not reintroduced once fixed.
+	* efi: Implement localboot support.
+
+Changes in 6.01:
+	* efi: Mark some symbols as __export otherwise libcom32.c32 and
+	  vesamenu.c32 will refuse to load.
+	* bios: Wire up the bios kernel loader. It was impossible to
+	  load a kernel from bios in 6.00.
+	* efi: Fix 'make installer'. There are no EFI installers so
+	  don't try and build them as we run into build errors.
+	* efi: Reuse the initial TFTP client port in subsequent
+	  transfers otherwise the server will send an error packet.
+	* efi: Some firmware will not set a default TTL value in IP
+	  packets - we must explicitly set it ourselves otherwise a
+	  value of zero may be used.
+	* bios, font: Fix a font regression affecting some VirtualBox
+	  users.
+
+Changes in 6.00:
+	* Add support for booting from EFI.
+	* EFI TCP/IP support. This allows the EFI backend to hook into
+	  the generic TFTP, HTTP and FTP functionality.
+
+Changes in 5.11:
+	* Dynamic debug support: Add new module, debug.c32, that allows
+	  debug code to be dynamically enabled and disabled at runtime.
+
+Changes in 5.10:
+	* PXELINUX: An entirely new network implementation based on
+	  the lwIP embedded TCP/IP stack.  As a result, plain PXELINUX
+	  can now support HTTP and FTP without gPXE/iPXE.  ls/readdir
+	  functionality is supported over HTTP with an indexing
+	  webserver, or over FTP with most common FTP servers. For the
+	  new network stack use lpxelinux.0. For the legacy stack use
+	  pxelinux.0.
+	* Rename the "ipappend" option to "sysappend" ("ipappend" is
+	  still accepted as an alias) and make it available for all
+	  derivatives.  Add additional strings derived from the system
+	  DMI/SMBIOS information if available.
+	* "sysappend" strings are also sent as http cookies, with the
+	  prefix _Syslinux_ added, on all http transfers.  This can be
+	  overridden with the SENDCOOKIES configuration file command.
+	* poweroff.c32: A new module to power off a system via APM. It
+	  replaces the poweroff COMBOOT module (Sebastian Herbszt).
+	* PXELINUX: Fix booting with DHCP options 209 and 210 which was
+	  broken in 5.00.
+	* Handle loading kernel images with no protected mode code. A
+	  legitimate kernel image can consist solely of real-mode code.
+	  The support for booting such images was broken in 5.00 (Josh Triplett).
+	* Fix a regression in the .psf font file loader introduced
+	  in 5.00.
+
+Changes in 5.01:
+	* txt/: A new AsciiDoc documentation set (work-in-progress)
+	  (Gene Cumm).
+	* core: Fix a bug in the realloc() implementation that caused
+	  machines to appear to run out of free memory.
+	* ldlinux: Fix multiple buffer overflows in cmdline parsing
+	  code that resulted in files failing to run and cmdlines
+	  being truncated.
+	* core: Fix debug build by tagging __bad_SEG() with __export.
+	* com32: Restrict library filenames to 8.3 format.
+	* EXTLINUX: Fix installation and subdirectory patching.
+	* ISOLINUX: Fix booting isohybrid images that are over 32K.
+	* com32: Strip modules to reduce their size.
+	* XFS: Implement directory block cache and fix
+          shortform-directory lookup (Paulo Alcantara).
+
+Changes in 5.00:
+	* com32: Switched from the COM32 object format to ELF as it is
+	  a much more powerful format that allows undefined symbols to
+	  be resolved at runtime and dynamic loading of module
+	  dependencies, which means modules now become shared object
+	  files instead of statically linked binaries - reducing both
+	  disk space and runtime memory consumption.
+	* core: Split non-core functionality into ldlinux.c32, which
+	  is an ELF module loaded by the core that contains everything
+	  the core doesn't require to boot the system, e.g. config
+	  parser, command-line interface, etc.
+	* Replaced __intcall() calls with direct function calls now
+	  that we can resolve undefined symbols at runtime, thanks to
+	  the ELF object support. Now that we no longer need to go
+	  through the 16-bit interrupt mechanism we can make full use
+	  of the 32-bit execution environment. This change required
+	  reimplementing lots of the 16-bit assembly code from core/
+	  in C.
+	* com32: __com32.cs_bounce is gone now we always run in a
+	  32-bit environment once we execute ldlinux.c32.
+	* ldlinux: A new "PATH" directive was added to the ldlinux.c32
+	  config parser that specifies a colon-separated list of
+	  directories to search when attempting to load modules.
+	* ALL: Delete all references to/code for 16-bit COMBOOT files.
+	  COMBOOT files (.cbt and .com) are no longer supported under
+	  Syslinux.
+
+Changes in 4.07:
+	* EXTLINUX: fix crash caused by dereferencing garbage pointer.
+	* Plug memory leak in searchdir which eventually leads to an
+	  observable hang (Shao Miller).
+	* ISOLINUX: fix bug triggered by isohybrid images larger than
+	  32K which results in an invalid image checksum error.
+	* menugen: make it Py3k compatible (Paulo Alcantara).
+
+Changes in 4.06:
+	* Support for NTFS, by Paulo Alcantara.
+	* EXTLINUX: more robust device detection, allow user to override.
+	* kontron_wdt.c32: Add a new module to enable the hardware
+	  watchdog of some Kontron boards. It allows enabling the watchdog
+	  and then booting a given image.
+	* HDT updated, and now can display images regarding some detection
+	  steps. Add postexec command to run a particular entry after
+	  HDT's execution, add silent option and various fixes.
+	* ifcpu.c32: Detect hypervisor presence.
+	* lua.c32: Add dhcp support and support for native Syslinux
+	  functions syslinux_config(), syslinux_ipappend_strings() and
+	  syslinux_reboot().
+	* isohybrid: Workaround for various EFI systems.
+	* pxechn.c32, a PXE NBP chainloader.  More versatile alternative
+	  to pxechain.com and resolves the PXELINUX -> WDS issue with
+	  Microsoft Windows Server 2008R2 (Gene Cumm).
+	* btrfs: Fix booting off of a subvolume.
+	* com32: Add device tree support.
+	* SYSLINUX: Fix relative paths for VFAT. The CONFIG and APPEND
+	  directives now support entirely relative paths.
+
+Changes in 4.05:
+	* HDT updated, and now supports uploading data to a TFTP
+	  server.
+	* ISOLINUX: remove the .img file support; it has been broken
+	  on virtually all systems since the beginning, and has been
+	  totally broken since 4.00 at least.  Use MEMDISK instead.
+	* chain.c32: Support chaining ReactOS' FreeLdr (Shao Miller)
+	* isohybrid: -m option to add support for Mac EFI booting.
+        * ifmemdsk.c32: Choose boot option based on presence of
+	  MEMDISK.
+	* Remove bogus distributed mk-lba-img binary.
+	* The Syslinux project has a new, cool logo by Abi
+	  "ixxvil" Rasheed (doc/logo/*).
+
+Changes in 4.04:
+	* PXELINUX: Fix handling of unqualified DNS names.
+	* PXELINUX: Fix timer bug when PXELINUX might be unloaded
+	  (Gene Cumm).
+	* core/writedec.inc: Fix duplicate declaration and overflow
+	  (Gene Cumm).
+	* GCC 4.5 fixes.
+	* sample directory: Fix Makefile include (Gene Cumm).
+	* ver.com: New universal DOS/COMBOOT application to display
+	  version information (includes DRMK) (Gene Cumm).
+	* rosh.c32: updated; Using getopt() for internal commands to aid
+	  parsing options; Fix bugs in ls; add warm reboot and echo
+	  (Gene Cumm).
+	* com32: fix a file descriptor leak.
+	* gfxboot.c32: handle TEXT..ENDTEXT; error out on no LABELs
+	  found (Sebastian Herbszt).
+	* Fix booting on non-partitioned devices.
+	* MBR, isohybrid: Workaround for a BIOS issue on Acer
+	  Travelmate and possibly other machines.
+        * COM32: Adding ACPI parsing libary
+        * HDT: Release 0.4.1 to support ACPI parsing, 
+          improved mutli-core/cpu reporting 
+	* LUA: Updating to 5.1.4-2
+	* SYSLINUX: core/diskstart.inc: Reset DS after checksum in case
+	  it isn't 0 (Gene Cumm).
+	* win64: Script update for additional mingw compiler names
+	  (Gene Cumm).
+	* diag: New directory for diagnostic-related tools.  Add a
+	  handoff MBR/VBR and geometry display images (Gene Cumm).
+	* MEMDISK: use "mem=" parameter to mark available memory above
+	  this point as reserved (core already does alignment) (Gene Cumm).
+	* MEMDISK: Additional disk probe checks and debug output
+	  (Shao Miller, Gene Cumm).
+	* gpxe: add gpxelinuxk.0, based off of undionly.kpxe + new
+	  script (Gene Cumm).
+	* isohybrid: install the isohdpfx*.bin/isohdppx*.bin files to
+	  make isohybrid images in one step with GNU xorriso.
+	* PXELINUX: disable a hack that would make localboot work on
+	  some machines, but break just about as many.  Some machines
+	  which worked with "localboot 0" in previous versions may
+	  need "localboot -1" in this one.  If you have a machine
+	  which requires "localboot -1", a copy of the dmidecode
+	  or sysdump output would be appreciated.
+	* Include a set of diagnostics by Gene Cumm.
+	* Fixes for gcc 4.6 and binutils 2.21.51.
+	* chain.c32: Allow "uuid" as a synonym to "guid".
+	* Handle directory names starting with .. for vfat and
+	  iso9660.
+	* New MENU HIDDENKEY command to provide a one-keystroke way to
+	  activate a boot option from a hidden menu intro screen.
+
+Changes in 4.03:
+	* Don't hang if no configuration file is found.
+	* Better support for booting from MBRs which don't pass
+	  handover information.
+	* EXTLINUX: Try to be smarter about finding the partition
+	  offset.
+	* chain.c32: support chainloading Dell Real Mode Kernel (Gene
+	  Cumm).
+	* chain.c32: fix booting in CHS mode.
+	* rosh.c32 updated (Gene Cumm).
+	* Fix the -s option to the syslinux/extlinux installer (Arwin
+	  Vosselman).
+	* isohybrid: fix padding of large images (PJ Pandit).
+
+Changes in 4.02:
+	* SYSLINUX: correctly handle the case where the -d option is
+	  specified with a non-absolute path, i.e. "syslinux -d
+	  syslinux" instead of "syslinux -d /syslinux".
+	* ISOLINUX: recognize the directory names /boot/syslinux and
+	  /syslinux, and the filename syslinux.cfg in addition to the
+	  isolinux-specific names.  Thus, "syslinux.cfg" is now a
+	  generic name, whereas "isolinux.cfg" or "extlinux.conf" is
+	  specific to different derivative.
+	* chain.c32: support setting alternate config filename for
+	  stage2 of GRUB Legacy (Gert Hulselmans).
+	* whichsys.c32: execute specific command, based on Syslinux
+	  bootloader variant (Gert Hulselmans).
+	* lua.c32: a lot of new bindings added to the "syslinux"
+	  namespace: VESA, PCI, DMI, kernel loading (Marcel Ritter).
+	* btrfs: print a comprehensive error message if compressed or
+	  encrypted files are encountered (neither is currently
+	  supported.)
+	* SYSLINUX: mtools installer: honor TMPDIR, error out on disk
+	  full.
+	* Handle fallbacks from EDD to CHS, to deal with systems which
+	  announce EDD support but don't actually have it.
+	* SYSLINUX: the mtools, DOS and win32 installers now use the new
+	  command line options.
+	* PXELINUX: fix the use of IP addresses in TFTP :: or tftp://
+	  host syntax.
+	* SYSLINUX: experimental Win64 installer (syslinux64.exe).
+
+Changes in 4.01:
+	* ISOLINUX: fix initialization on systems which don't zero
+	  low memory.
+	* SYSLINUX/EXTLINUX: fix handing of disk read retries in
+	  EDD mode.
+	* ISOLINUX: change the initialization sequence to avoid
+	  problems with certain (old) BIOSes.  Special thanks to
+	  Helmut Hullen for invaluable debugging support.
+	* ifplop.c32: new module which detects if the PLoP Boot Loader
+	  already has booted a CDROM or USB drive (Gert Hulselmans).
+	* Correct a severe memory overwrite bug, triggered primarily
+	  when selecting a very long command line in the menu system.
+	* lua.c32: Lua script interpreter, currently experimental
+	  (Alexey Zaytsev, Marcel Ritter, Geert Stappers).
+	* PXELINUX: new option IPAPPEND 4 to append the system UUID to
+	  the kernel command line.
+	* PXELINUX: display BOOTIF and SYSUUID at startup time, and
+	  when Ctrl-N is pressed on the command line.
+
+Changes in 4.00:
+	* Major code base changes; all filesystem rewritten in C.
+	  This work was done primarily by Liu Aleaxander (Yuanhan Liu).
+	* EXTLINUX: btrfs and ext4 support.  btrfs support was done by
+	  Alek Du of Intel.
+	* EXTLINUX is no longer a separate derivative; extlinux and
+	  syslinux both install the same loader (ldlinux.sys); for the
+	  Linux-based installers the extlinux binary is used for a
+	  mounted filesystem; the syslinux binary for an unmounted
+	  filesystem.
+	* When loading a new configuration file with the CONFIG
+	  command, one can now also specify a new current directory
+	  with an APPEND statement.
+	* Full ADV support for Syslinux, to boot-once and MENU SAVE
+	  works.
+	* Full support of GPT-partitioned disks, including disks
+	  and/or parititions larger than 2 TiB (if supported by BIOS.)
+	* The GPT handover protocol adjusted to the current T13
+	  committee draft; see doc/gpt.txt.
+	* HDT: code cleanup, small bugfixes
+	* The "linux" syslinux installer (syslinux-nomtools) now has a
+	  command-line syntax closer to the extlinux installer.  The
+	  mtools, dos and win32 installers will get this new syntax
+	  eventually, but it is not implemented yet.
+	* chain.c32: support booting GPT partitions by index, GUID, label.
+	* chain.c32: support booting the Syslinux partition with "fs".
+	* chain.c32: implement gpt.txt hand-over protocol.
+	* chain.c32: support for chainloading Grub stage 2.
+	* PXELINUX: TFTP URL syntax (tftp://) supported even when not
+	  running gPXE/gpxelinux.
+	* New ls.c32 module to display the contents of the disk from
+	  the command line, and pwd.c32 to display the current
+	  directory.
+	* rosh.c32 (read only shell) updated and hopefully usable.
+	* PXELINUX: Support "localboot -1", just like the other
+	  derivatives.
+	* gfxboot.com removed in favor of gfxboot.c32.
+	* New MENU HELP statement to display fullscreen help text as a
+	  result of a menu selection.
+	* memdiskfind utility that can be used with the phram driver
+	  in the Linux kernel to mount a memdisk.
+        * ifcpu.c32: Adding usage when no parameters are given, 
+          adding PAE support.
+	* ifcpu.c32, ifcpu64.c32: handle more than one argument per
+	  target.
+	* isohybrid: C version which does not require Perl.
+	* New command MENU IMMEDIATE to permit hotkeys to activate
+	  immediately without needing Enter.
+	* mdiskchk.com supports a --no-sequential (or -n) option to
+	  suppress the classic all-drive-probing heuristic.  Useful
+	  on BIOSes who crash/hang when certain drive numbers are
+	  probed.
+	* ElTorito.Sys DOS driver now scans drive numbers upwards
+	  instead of downwards, in order to avoid a fairly common
+	  bug on some BIOSes where probing drive 0xFF causes a
+	  failure.
+	* NASM 2.03 or later required to build.  2.07 or later
+          recommended.
+
+Changes in 3.86:
+	* chain.c32: fix chainloading the MBR of a hard disk (broken
+	  in 3.85).
+	* mboot.c32: report the boot loader name in the information
+	  structure.
+	* com32: set argv[0] in a com32 module.
+	* core: add a workaround for a bug in Xen HVM older than
+	  version 3.3: disable halt on those platforms.
+	* Fix problems where certain operations in com32 modules would
+	  cause the core to believe the system was idle.
+	* MEMDISK: fix MBR detection when used with a DOSEMU header or
+	  an offset.
+	* MEMDISK: generate the mBFT checksum correctly.
+
 Changes in 3.85:
 	* gPXELINUX: updated to gPXE 1.0.0.  gPXELINUX can now do NBP
 	  chainloading, and does not require a second DHCP.

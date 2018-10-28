@@ -11,38 +11,40 @@
 ##
 ## -----------------------------------------------------------------------
 
-topdir = ..
-include $(topdir)/MCONFIG.embedded
+include $(MAKEDIR)/embedded.mk
 -include $(topdir)/version.mk
 
-INCLUDES = -I$(topdir)/com32/include
-CFLAGS  += -DDATE='"$(DATE)"'
+INCLUDES = -I$(topdir)/com32/include -I$(objdir)
+CFLAGS  += -D__MEMDISK__ -DDATE='"$(DATE)"' -mregparm=3 -DREGPARM=3
 LDFLAGS  = $(GCCOPT) -g
 NASM     = nasm
-NASMOPT  = -O9999
+NASMOPT  = -Ox
 NFLAGS   = -dDATE='"$(DATE)"'
-NINCLUDE =
+NINCLUDE = -I$(SRC)/
 
-SRCS	 = $(wildcard *.asm *.c *.h)
+VPATH = $(SRC)
+SRCS	 = $(sort $(wildcard *.asm *.c *.h))
 
 # The DATE is set on the make command line when building binaries for
 # official release.  Otherwise, substitute a hex string that is pretty much
 # guaranteed to be unique to be unique from build to build.
 ifndef HEXDATE
-HEXDATE := $(shell $(PERL) ../now.pl $(SRCS))
+HEXDATE := $(shell $(PERL) $(SRC)/../now.pl $(SRCS))
 endif
 ifndef DATE
-DATE    := $(shell sh ../gen-id.sh $(VERSION) $(HEXDATE))
+DATE    := $(shell sh $(SRC)/../gen-id.sh $(VERSION) $(HEXDATE))
 endif
 
 # Important: init.o16 must be first!!
 OBJS16   = init.o16 init32.o
 OBJS32   = start32.o setup.o msetup.o e820func.o conio.o memcpy.o memset.o \
 	   memmove.o unzip.o dskprobe.o eltorito.o \
+	   ctypes.o strntoumax.o strtoull.o suffix_number.o \
 	   memdisk_chs_512.o memdisk_edd_512.o \
 	   memdisk_iso_512.o memdisk_iso_2048.o
 
-CSRC     = setup.c msetup.c e820func.c conio.c unzip.c dskprobe.c eltorito.c
+CSRC     = setup.c msetup.c e820func.c conio.c unzip.c dskprobe.c eltorito.c \
+	   ctypes.c strntoumax.c strtoull.c suffix_number.c
 SSRC     = start32.S memcpy.S memset.S memmove.S
 NASMSRC  = memdisk_chs_512.asm memdisk_edd_512.asm \
 	   memdisk_iso_512.asm memdisk_iso_2048.asm \
@@ -81,14 +83,15 @@ memdisk_%.o: memdisk_%.bin
 memdisk16.elf: $(OBJS16)
 	$(LD) -Ttext 0 -o $@ $^
 
-memdisk32.elf: memdisk.ld $(OBJS32)
+#memdisk32.elf: memdisk.ld $(OBJS32)
+memdisk32.elf: $(ARCH)/memdisk.ld $(OBJS32)
 	$(LD) -o $@ -T $^
 
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
 
 memdisk: memdisk16.bin memdisk32.bin postprocess.pl
-	$(PERL) postprocess.pl $@ memdisk16.bin memdisk32.bin
+	$(PERL) $(SRC)/postprocess.pl $@ memdisk16.bin memdisk32.bin
 
 e820test: e820test.c e820func.c msetup.c
 	$(CC) -m32 -g $(GCCWARN) -DTEST -o $@ $^

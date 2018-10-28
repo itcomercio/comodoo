@@ -10,7 +10,7 @@
  *
  * ----------------------------------------------------------------------- */
 
-#include "menu.h"
+#include "cmenu.h"
 #include "com32io.h"
 #include <stdlib.h>
 #include <console.h>
@@ -655,9 +655,9 @@ pt_menuitem showmenus(uchar startmenu)
                ms->menus[(unsigned int)startmenu], 0, NORMALMENU);
 
     // Hide the garbage we left on the screen
-    cursoron();
     cls();
     gotoxy(ms->minrow, ms->mincol);
+    cursoron();
 
     // Return user choice
     return rv;

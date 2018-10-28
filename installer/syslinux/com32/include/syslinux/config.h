@@ -39,7 +39,7 @@
 #include <com32.h>
 
 enum syslinux_filesystem {
-    SYSLINUX_FS_UNKNOWN = 0x30,
+    SYSLINUX_FS_UNKNOWN  = 0x30,
     SYSLINUX_FS_SYSLINUX = 0x31,
     SYSLINUX_FS_PXELINUX = 0x32,
     SYSLINUX_FS_ISOLINUX = 0x33,
@@ -52,6 +52,14 @@ struct syslinux_version {
     enum syslinux_filesystem filesystem;
     const char *version_string;
     const char *copyright_string;
+};
+
+struct syslinux_ipinfo {
+    uint32_t ipver;
+    uint32_t myip;
+    uint32_t serverip;
+    uint32_t gateway;
+    uint32_t netmask;
 };
 
 extern __nocommon struct syslinux_version __syslinux_version;
@@ -104,10 +112,11 @@ union syslinux_derivative_info {
 	uint32_t _eflags;
 	const void *ptab_ptr;
 	const uint32_t *esdi_ptr;
+	const uint64_t *partoffset;
     } disk;			/* syslinux/extlinux */
     struct {
-	uint16_t _gs, _fs, _es, _ds;
-	uint32_t _edi, _esi, _ebp, _esp, _ebx;
+	uint16_t _gs, stack_seg, pxenv_seg, _ds;
+	uint32_t _edi, stack_offs, _ebp, _esp, pxenv_offs;
 	uint16_t apiver;
 	uint16_t _dxh;
 	uint32_t myip;
@@ -116,6 +125,7 @@ union syslinux_derivative_info {
 	uint32_t _eflags;
 	const void *pxenvptr;
 	const void *stack;
+	const struct syslinux_ipinfo *ipinfo;
     } pxe;			/* pxelinux */
     struct {
 	uint16_t _gs, _fs, _es, _ds;
@@ -129,6 +139,7 @@ union syslinux_derivative_info {
 	uint32_t _eflags;
 	const void *spec_packet;
 	const uint32_t *esdi_ptr;
+	const uint64_t *partoffset;
     } iso;			/* isolinux */
 };
 
@@ -145,6 +156,8 @@ struct syslinux_serial_console_info {
     uint16_t flowctl;
 };
 
+extern void __syslinux_set_serial_console_info(void);
+
 extern __nocommon struct syslinux_serial_console_info
     __syslinux_serial_console_info;
 static inline const struct syslinux_serial_console_info
@@ -153,10 +166,10 @@ static inline const struct syslinux_serial_console_info
     return &__syslinux_serial_console_info;
 }
 
-extern __nocommon const char *__syslinux_config_file;
+extern char ConfigName[];
 static inline const char *syslinux_config_file(void)
 {
-    return __syslinux_config_file;
+    return ConfigName;
 }
 
 struct syslinux_ipappend_strings {
@@ -169,5 +182,12 @@ static inline const struct syslinux_ipappend_strings
 {
     return &__syslinux_ipappend_strings;
 }
+
+static inline enum syslinux_filesystem syslinux_filesystem(void)
+{
+    return syslinux_derivative_info()->c.filesystem;
+}
+
+extern void get_derivative_info(union syslinux_derivative_info *di);
 
 #endif /* _SYSLINUX_CONFIG_H */

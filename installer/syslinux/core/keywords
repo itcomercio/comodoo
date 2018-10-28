@@ -16,6 +16,7 @@ linux
 boot
 bss
 pxe
+pxeretry
 fdimage
 comboot
 com32
@@ -33,6 +34,8 @@ onerror
 noescape
 nocomplete
 nohalt
+sysappend
+sendcookies
 f0
 f1
 f2

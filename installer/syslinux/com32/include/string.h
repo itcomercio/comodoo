@@ -23,7 +23,6 @@ __extern char *strcat(char *, const char *);
 __extern char *strchr(const char *, int);
 __extern int strcmp(const char *, const char *);
 __extern char *strcpy(char *, const char *);
-__extern char *strpcpy(char *, const char *);
 __extern size_t strcspn(const char *, const char *);
 __extern char *strdup(const char *);
 __extern char *strndup(const char *, size_t);
@@ -43,5 +42,6 @@ __extern char *strsep(char **, const char *);
 __extern size_t strspn(const char *, const char *);
 __extern char *strstr(const char *, const char *);
 __extern char *strtok(char *, const char *);
+__extern char *strreplace(const char *, const char *, const char *);
 
 #endif /* _STRING_H */

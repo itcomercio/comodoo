@@ -1,6 +1,7 @@
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 1998-2008 H. Peter Anvin - All Rights Reserved
+ *   Copyright 2009-2014 Intel Corporation; author: H. Peter Anvin
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -13,21 +14,24 @@
 /*
  * extlinux.c
  *
- * Install the extlinux boot block on an ext2/3 filesystem
+ * Install the syslinux boot block on a fat, ntfs, ext2/3/4, btrfs, xfs,
+ * and ufs1/2 filesystem.
  */
 
 #define  _GNU_SOURCE		/* Enable everything */
 #include <inttypes.h>
 /* This is needed to deal with the kernel headers imported into glibc 3.3.3. */
-typedef uint64_t u64;
 #include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <dirent.h>
 #ifndef __KLIBC__
 #include <mntent.h>
 #endif
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
@@ -38,15 +42,25 @@ typedef uint64_t u64;
 #include <sys/mount.h>
 #include <sys/vfs.h>
 
-#include <linux/fd.h>		/* Floppy geometry */
-#include <linux/hdreg.h>	/* Hard disk geometry */
-#define statfs _kernel_statfs	/* HACK to deal with broken 2.4 distros */
-#include <linux/fs.h>		/* FIGETBSZ, FIBMAP */
-#undef statfs
+#include "linuxioctl.h"
 
-#include "ext2_fs.h"
-#include "../version.h"
+#include "btrfs.h"
+#include "fat.h"
+#include "ntfs.h"
+#include "xfs.h"
+#include "xfs_types.h"
+#include "xfs_sb.h"
+#include "ufs.h"
+#include "ufs_fs.h"
+#include "misc.h"
+#include "version.h"
 #include "syslxint.h"
+#include "syslxcom.h" /* common functions shared with extlinux and syslinux */
+#include "syslxrw.h"
+#include "syslxfs.h"
+#include "setadv.h"
+#include "syslxopt.h" /* unified options */
+#include "mountinfo.h"
 
 #ifdef DEBUG
 # define dprintf printf
@@ -54,251 +68,34 @@ typedef uint64_t u64;
 # define dprintf(...) ((void)0)
 #endif
 
-/* Global option handling */
-
-const char *program;
-
-/* These are the options we can set and their values */
-struct my_options {
-    unsigned int sectors;
-    unsigned int heads;
-    int raid_mode;
-    int reset_adv;
-    const char *set_once;
-} opt = {
-.sectors = 0,.heads = 0,.raid_mode = 0,.reset_adv = 0,.set_once = NULL,};
-
-static void __attribute__ ((noreturn)) usage(int rv)
-{
-    fprintf(stderr,
-	    "Usage: %s [options] directory\n"
-	    "  --install    -i  Install over the current bootsector\n"
-	    "  --update     -U  Update a previous EXTLINUX installation\n"
-	    "  --zip        -z  Force zipdrive geometry (-H 64 -S 32)\n"
-	    "  --sectors=#  -S  Force the number of sectors per track\n"
-	    "  --heads=#    -H  Force number of heads\n"
-	    "  --raid       -r  Fall back to the next device on boot failure\n"
-	    "  --once=...   -o  Execute a command once upon boot\n"
-	    "  --clear-once -O  Clear the boot-once command\n"
-	    "  --reset-adv      Reset auxilliary data\n"
-	    "\n"
-	    "  Note: geometry is determined at boot time for devices which\n"
-	    "  are considered hard disks by the BIOS.  Unfortunately, this is\n"
-	    "  not possible for devices which are considered floppy disks,\n"
-	    "  which includes zipdisks and LS-120 superfloppies.\n"
-	    "\n"
-	    "  The -z option is useful for USB devices which are considered\n"
-	    "  hard disks by some BIOSes and zipdrives by other BIOSes.\n",
-	    program);
-
-    exit(rv);
-}
-
-enum long_only_opt {
-    OPT_NONE,
-    OPT_RESET_ADV,
-};
-
-static const struct option long_options[] = {
-    {"install", 0, NULL, 'i'},
-    {"update", 0, NULL, 'U'},
-    {"zipdrive", 0, NULL, 'z'},
-    {"sectors", 1, NULL, 'S'},
-    {"heads", 1, NULL, 'H'},
-    {"raid-mode", 0, NULL, 'r'},
-    {"version", 0, NULL, 'v'},
-    {"help", 0, NULL, 'h'},
-    {"once", 1, NULL, 'o'},
-    {"clear-once", 0, NULL, 'O'},
-    {"reset-adv", 0, NULL, OPT_RESET_ADV},
-    {0, 0, 0, 0}
-};
-
-static const char short_options[] = "iUuzS:H:rvho:O";
-
-#if defined(__linux__) && !defined(BLKGETSIZE64)
-/* This takes a u64, but the size field says size_t.  Someone screwed big. */
-# define BLKGETSIZE64 _IOR(0x12,114,size_t)
-#endif
-
-#define LDLINUX_MAGIC	0x3eb202fe
-
-enum bs_offsets {
-    bsJump = 0x00,
-    bsOemName = 0x03,
-    bsBytesPerSec = 0x0b,
-    bsSecPerClust = 0x0d,
-    bsResSectors = 0x0e,
-    bsFATs = 0x10,
-    bsRootDirEnts = 0x11,
-    bsSectors = 0x13,
-    bsMedia = 0x15,
-    bsFATsecs = 0x16,
-    bsSecPerTrack = 0x18,
-    bsHeads = 0x1a,
-    bsHiddenSecs = 0x1c,
-    bsHugeSectors = 0x20,
-
-    /* FAT12/16 only */
-    bs16DriveNumber = 0x24,
-    bs16Reserved1 = 0x25,
-    bs16BootSignature = 0x26,
-    bs16VolumeID = 0x27,
-    bs16VolumeLabel = 0x2b,
-    bs16FileSysType = 0x36,
-    bs16Code = 0x3e,
-
-    /* FAT32 only */
-    bs32FATSz32 = 36,
-    bs32ExtFlags = 40,
-    bs32FSVer = 42,
-    bs32RootClus = 44,
-    bs32FSInfo = 48,
-    bs32BkBootSec = 50,
-    bs32Reserved = 52,
-    bs32DriveNumber = 64,
-    bs32Reserved1 = 65,
-    bs32BootSignature = 66,
-    bs32VolumeID = 67,
-    bs32VolumeLabel = 71,
-    bs32FileSysType = 82,
-    bs32Code = 90,
-
-    bsSignature = 0x1fe
-};
-
-#define bsHead      bsJump
-#define bsHeadLen   (bsOemName-bsHead)
-#define bsCode	    bs32Code	/* The common safe choice */
-#define bsCodeLen   (bsSignature-bs32Code)
-
 #ifndef EXT2_SUPER_OFFSET
 #define EXT2_SUPER_OFFSET 1024
 #endif
 
-/*
- * Boot block
+/* Since we have unused 2048 bytes in the primary AG of an XFS partition,
+ * we will use the first 0~512 bytes starting from 2048 for the Syslinux
+ * boot sector.
  */
-extern unsigned char extlinux_bootsect[];
-extern unsigned int extlinux_bootsect_len;
-#define boot_block	extlinux_bootsect
-#define boot_block_len  extlinux_bootsect_len
-
-/*
- * Image file
- */
-extern unsigned char extlinux_image[];
-extern unsigned int extlinux_image_len;
-#define boot_image	extlinux_image
-#define boot_image_len  extlinux_image_len
+#define XFS_BOOTSECT_OFFSET	(4 << SECTOR_SHIFT)
+#define XFS_SUPPORTED_BLOCKSIZE 4096 /* 4 KiB filesystem block size */
 
 /*
- * Common abort function
+ * btrfs has two discontiguous areas reserved for the boot loader.
+ * Use the first one (Boot Area A) for the boot sector and the ADV,
+ * and the second one for "ldlinux.sys".
  */
-void __attribute__ ((noreturn)) die(const char *msg)
-{
-    fputs(msg, stderr);
-    exit(1);
-}
+#define BTRFS_EXTLINUX_OFFSET	BTRFS_BOOT_AREA_B_OFFSET
+#define BTRFS_EXTLINUX_SIZE	BTRFS_BOOT_AREA_B_SIZE
+#define BTRFS_SUBVOL_MAX 256	/* By btrfs specification */
+static char subvol[BTRFS_SUBVOL_MAX];
 
-/*
- * read/write wrapper functions
- */
-ssize_t xpread(int fd, void *buf, size_t count, off_t offset)
-{
-    char *bufp = (char *)buf;
-    ssize_t rv;
-    ssize_t done = 0;
-
-    while (count) {
-	rv = pread(fd, bufp, count, offset);
-	if (rv == 0) {
-	    die("short read");
-	} else if (rv == -1) {
-	    if (errno == EINTR) {
-		continue;
-	    } else {
-		die(strerror(errno));
-	    }
-	} else {
-	    bufp += rv;
-	    offset += rv;
-	    done += rv;
-	    count -= rv;
-	}
-    }
-
-    return done;
-}
-
-ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset)
-{
-    const char *bufp = (const char *)buf;
-    ssize_t rv;
-    ssize_t done = 0;
-
-    while (count) {
-	rv = pwrite(fd, bufp, count, offset);
-	if (rv == 0) {
-	    die("short write");
-	} else if (rv == -1) {
-	    if (errno == EINTR) {
-		continue;
-	    } else {
-		die(strerror(errno));
-	    }
-	} else {
-	    bufp += rv;
-	    offset += rv;
-	    done += rv;
-	    count -= rv;
-	}
-    }
-
-    return done;
-}
-
-/*
- * Produce file map
- */
-int sectmap(int fd, uint32_t * sectors, int nsectors)
-{
-    unsigned int blksize, blk, nblk;
-    unsigned int i;
-
-    /* Get block size */
-    if (ioctl(fd, FIGETBSZ, &blksize))
-	return -1;
-
-    /* Number of sectors per block */
-    blksize >>= SECTOR_SHIFT;
-
-    nblk = 0;
-    while (nsectors) {
-
-	blk = nblk++;
-	dprintf("querying block %u\n", blk);
-	if (ioctl(fd, FIBMAP, &blk))
-	    return -1;
-
-	blk *= blksize;
-	for (i = 0; i < blksize; i++) {
-	    if (!nsectors)
-		return 0;
-
-	    dprintf("Sector: %10u\n", blk);
-	    *sectors++ = blk++;
-	    nsectors--;
-	}
-    }
-
-    return 0;
-}
+#define BTRFS_ADV_OFFSET (BTRFS_BOOT_AREA_A_OFFSET + BTRFS_BOOT_AREA_A_SIZE \
+			  - 2*ADV_SIZE)
 
 /*
  * Get the size of a block device
  */
-uint64_t get_size(int devfd)
+static uint64_t get_size(int devfd)
 {
     uint64_t bytes;
     uint32_t sects;
@@ -324,6 +121,32 @@ struct geometry_table {
     struct hd_geometry g;
 };
 
+static int sysfs_get_offset(int devfd, unsigned long *start)
+{
+    struct stat st;
+    char sysfs_name[128];
+    FILE *f;
+    int rv;
+
+    if (fstat(devfd, &st))
+	return -1;
+
+    if ((size_t)snprintf(sysfs_name, sizeof sysfs_name,
+			 "/sys/dev/block/%u:%u/start",
+			 major(st.st_rdev), minor(st.st_rdev))
+	>= sizeof sysfs_name)
+	return -1;
+
+    f = fopen(sysfs_name, "r");
+    if (!f)
+	return -1;
+
+    rv = fscanf(f, "%lu", start);
+    fclose(f);
+
+    return (rv == 1) ? 0 : -1;
+}
+
 /* Standard floppy disk geometries, plus LS-120.  Zipdisk geometry
    (x/64/32) is the final fallback.  I don't know what LS-240 has
    as its geometry, since I don't have one and don't know anyone that does,
@@ -344,25 +167,28 @@ static const struct geometry_table standard_geometries[] = {
 int get_geometry(int devfd, uint64_t totalbytes, struct hd_geometry *geo)
 {
     struct floppy_struct fd_str;
+    struct loop_info li;
+    struct loop_info64 li64;
     const struct geometry_table *gp;
+    int rv = 0;
 
     memset(geo, 0, sizeof *geo);
 
-    if (!ioctl(devfd, HDIO_GETGEO, &geo)) {
-	return 0;
+    if (!ioctl(devfd, HDIO_GETGEO, geo)) {
+	goto ok;
     } else if (!ioctl(devfd, FDGETPRM, &fd_str)) {
 	geo->heads = fd_str.head;
 	geo->sectors = fd_str.sect;
 	geo->cylinders = fd_str.track;
 	geo->start = 0;
-	return 0;
+	goto ok;
     }
 
     /* Didn't work.  Let's see if this is one of the standard geometries */
     for (gp = standard_geometries; gp->bytes; gp++) {
 	if (gp->bytes == totalbytes) {
 	    memcpy(geo, &gp->g, sizeof *geo);
-	    return 0;
+	    goto ok;
 	}
     }
 
@@ -375,35 +201,84 @@ int get_geometry(int devfd, uint64_t totalbytes, struct hd_geometry *geo)
     geo->cylinders = totalbytes / (geo->heads * geo->sectors << SECTOR_SHIFT);
     geo->start = 0;
 
-    if (!opt.sectors && !opt.heads)
+    if (!opt.sectors && !opt.heads) {
 	fprintf(stderr,
 		"Warning: unable to obtain device geometry (defaulting to %d heads, %d sectors)\n"
 		"         (on hard disks, this is usually harmless.)\n",
 		geo->heads, geo->sectors);
+	rv = 1;			/* Suboptimal result */
+    }
 
-    return 1;
+ok:
+    /* If this is a loopback device, try to set the start */
+    if (!ioctl(devfd, LOOP_GET_STATUS64, &li64))
+	geo->start = li64.lo_offset >> SECTOR_SHIFT;
+    else if (!ioctl(devfd, LOOP_GET_STATUS, &li))
+	geo->start = (unsigned int)li.lo_offset >> SECTOR_SHIFT;
+    else if (!sysfs_get_offset(devfd, &geo->start)) {
+	/* OK */
+    }
+
+    return rv;
 }
 
 /*
  * Query the device geometry and put it into the boot sector.
  * Map the file and put the map in the boot sector and file.
  * Stick the "current directory" inode number into the file.
+ *
+ * Returns the number of modified bytes in the boot file.
  */
-void patch_file_and_bootblock(int fd, int dirfd, int devfd)
+static int patch_file_and_bootblock(int fd, const char *dir, int devfd)
 {
-    struct stat dirst;
+    struct stat dirst, xdst;
     struct hd_geometry geo;
-    uint32_t *sectp;
+    sector_t *sectp;
     uint64_t totalbytes, totalsectors;
     int nsect;
-    unsigned char *p, *patcharea;
-    int i, dw;
-    uint32_t csum;
+    struct fat_boot_sector *sbs;
+    char *dirpath, *subpath, *xdirpath;
+    int rv;
 
-    if (fstat(dirfd, &dirst)) {
-	perror("fstat dirfd");
+    dirpath = realpath(dir, NULL);
+    if (!dirpath || stat(dir, &dirst)) {
+	perror("accessing install directory");
 	exit(255);		/* This should never happen */
     }
+
+    if (lstat(dirpath, &xdst) ||
+	dirst.st_ino != xdst.st_ino ||
+	dirst.st_dev != xdst.st_dev) {
+	perror("realpath returned nonsense");
+	exit(255);
+    }
+
+    subpath = strchr(dirpath, '\0');
+    for (;;) {
+	if (*subpath == '/') {
+	    if (subpath > dirpath) {
+		*subpath = '\0';
+		xdirpath = dirpath;
+	    } else {
+		xdirpath = "/";
+	    }
+	    if (lstat(xdirpath, &xdst) || dirst.st_dev != xdst.st_dev) {
+		subpath = strchr(subpath+1, '/');
+		if (!subpath)
+		    subpath = "/"; /* It's the root of the filesystem */
+		break;
+	    }
+	    *subpath = '/';
+	}
+
+	if (subpath == dirpath)
+	    break;
+
+	subpath--;
+    }
+
+    /* Now subpath should contain the path relative to the fs base */
+    dprintf("subpath = %s\n", subpath);
 
     totalbytes = get_size(devfd);
     get_geometry(devfd, totalbytes, &geo);
@@ -418,224 +293,102 @@ void patch_file_and_bootblock(int fd, int dirfd, int devfd)
        early bootstrap share code with the FAT version. */
     dprintf("heads = %u, sect = %u\n", geo.heads, geo.sectors);
 
+    sbs = (struct fat_boot_sector *)syslinux_bootsect;
+
     totalsectors = totalbytes >> SECTOR_SHIFT;
     if (totalsectors >= 65536) {
-	set_16(boot_block + bsSectors, 0);
+	set_16(&sbs->bsSectors, 0);
     } else {
-	set_16(boot_block + bsSectors, totalsectors);
+	set_16(&sbs->bsSectors, totalsectors);
     }
-    set_32(boot_block + bsHugeSectors, totalsectors);
+    set_32(&sbs->bsHugeSectors, totalsectors);
 
-    set_16(boot_block + bsBytesPerSec, SECTOR_SIZE);
-    set_16(boot_block + bsSecPerTrack, geo.sectors);
-    set_16(boot_block + bsHeads, geo.heads);
-    set_32(boot_block + bsHiddenSecs, geo.start);
+    set_16(&sbs->bsBytesPerSec, SECTOR_SIZE);
+    set_16(&sbs->bsSecPerTrack, geo.sectors);
+    set_16(&sbs->bsHeads, geo.heads);
+    set_32(&sbs->bsHiddenSecs, geo.start);
 
-    /* If we're in RAID mode then patch the appropriate instruction;
-       either way write the proper boot signature */
-    i = get_16(boot_block + 0x1FE);
-    if (opt.raid_mode)
-	set_16(boot_block + i, 0x18CD);	/* INT 18h */
-
-    set_16(boot_block + 0x1FE, 0xAA55);
-
-    /* Construct the boot file */
+    /* Construct the boot file map */
 
     dprintf("directory inode = %lu\n", (unsigned long)dirst.st_ino);
     nsect = (boot_image_len + SECTOR_SIZE - 1) >> SECTOR_SHIFT;
     nsect += 2;			/* Two sectors for the ADV */
-    sectp = alloca(sizeof(uint32_t) * nsect);
-    if (sectmap(fd, sectp, nsect)) {
-	perror("bmap");
-	exit(1);
-    }
-
-    /* First sector need pointer in boot sector */
-    set_32(boot_block + 0x1F8, *sectp++);
-    nsect--;
-
-    /* Search for LDLINUX_MAGIC to find the patch area */
-    for (p = boot_image; get_32(p) != LDLINUX_MAGIC; p += 4) ;
-    patcharea = p + 8;
-
-    /* Set up the totals */
-    dw = boot_image_len >> 2;	/* COMPLETE dwords, excluding ADV */
-    set_16(patcharea, dw);
-    set_16(patcharea + 2, nsect);	/* Not including the first sector, but
-					   including the ADV */
-    set_32(patcharea + 8, dirst.st_ino);	/* "Current" directory */
-
-    /* Set the sector pointers */
-    p = patcharea + 12;
-
-    memset(p, 0, 64 * 4);
-    while (nsect--) {
-	set_32(p, *sectp++);
-	p += 4;
-    }
-
-    /* Now produce a checksum */
-    set_32(patcharea + 4, 0);
-
-    csum = LDLINUX_MAGIC;
-    for (i = 0, p = boot_image; i < dw; i++, p += 4)
-	csum -= get_32(p);	/* Negative checksum */
-
-    set_32(patcharea + 4, csum);
-}
-
-/*
- * Read the ADV from an existing instance, or initialize if invalid.
- * Returns -1 on fatal errors, 0 if ADV is okay, and 1 if no valid
- * ADV was found.
- */
-int read_adv(const char *path)
-{
-    char *file;
-    int fd = -1;
-    struct stat st;
-    int err = 0;
-
-    asprintf(&file, "%s%sextlinux.sys",
-	     path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
-
-    if (!file) {
-	perror(program);
-	return -1;
-    }
-
-    fd = open(file, O_RDONLY);
-    if (fd < 0) {
-	if (errno != ENOENT) {
-	    err = -1;
-	} else {
-	    syslinux_reset_adv(syslinux_adv);
+    sectp = alloca(sizeof(sector_t) * nsect);
+    if (fs_type == EXT2 || fs_type == VFAT || fs_type == NTFS ||
+	fs_type == XFS || fs_type == UFS1 || fs_type == UFS2) {
+	if (sectmap(fd, sectp, nsect)) {
+		perror("bmap");
+		exit(1);
 	}
-    } else if (fstat(fd, &st)) {
-	err = -1;
-    } else if (st.st_size < 2 * ADV_SIZE) {
-	/* Too small to be useful */
-	syslinux_reset_adv(syslinux_adv);
-	err = 0;		/* Nothing to read... */
-    } else if (xpread(fd, syslinux_adv, 2 * ADV_SIZE,
-		      st.st_size - 2 * ADV_SIZE) != 2 * ADV_SIZE) {
-	err = -1;
-    } else {
-	/* We got it... maybe? */
-	err = syslinux_validate_adv(syslinux_adv) ? 1 : 0;
+    } else if (fs_type == BTRFS) {
+	int i;
+	sector_t *sp = sectp;
+
+	for (i = 0; i < nsect - 2; i++)
+	    *sp++ = BTRFS_EXTLINUX_OFFSET/SECTOR_SIZE + i;
+	for (i = 0; i < 2; i++)
+	    *sp++ = BTRFS_ADV_OFFSET/SECTOR_SIZE + i;
     }
 
-    if (err < 0)
-	perror(file);
+    /* Create the modified image in memory */
+    rv = syslinux_patch(sectp, nsect, opt.stupid_mode,
+			opt.raid_mode, subpath, subvol);
 
-    if (fd >= 0)
-	close(fd);
-    if (file)
-	free(file);
-
-    return err;
-}
-
-/*
- * Update the ADV in an existing installation.
- */
-int write_adv(const char *path)
-{
-    unsigned char advtmp[2 * ADV_SIZE];
-    char *file;
-    int fd = -1;
-    struct stat st, xst;
-    int err = 0;
-    int flags, nflags;
-
-    asprintf(&file, "%s%sextlinux.sys",
-	     path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
-
-    if (!file) {
-	perror(program);
-	return -1;
-    }
-
-    fd = open(file, O_RDONLY);
-    if (fd < 0) {
-	err = -1;
-    } else if (fstat(fd, &st)) {
-	err = -1;
-    } else if (st.st_size < 2 * ADV_SIZE) {
-	/* Too small to be useful */
-	err = -2;
-    } else if (xpread(fd, advtmp, 2 * ADV_SIZE,
-		      st.st_size - 2 * ADV_SIZE) != 2 * ADV_SIZE) {
-	err = -1;
-    } else {
-	/* We got it... maybe? */
-	err = syslinux_validate_adv(advtmp) ? -2 : 0;
-	if (!err) {
-	    /* Got a good one, write our own ADV here */
-	    if (!ioctl(fd, EXT2_IOC_GETFLAGS, &flags)) {
-		nflags = flags & ~EXT2_IMMUTABLE_FL;
-		if (nflags != flags)
-		    ioctl(fd, EXT2_IOC_SETFLAGS, &nflags);
-	    }
-	    if (!(st.st_mode & S_IWUSR))
-		fchmod(fd, st.st_mode | S_IWUSR);
-
-	    /* Need to re-open read-write */
-	    close(fd);
-	    fd = open(file, O_RDWR | O_SYNC);
-	    if (fd < 0) {
-		err = -1;
-	    } else if (fstat(fd, &xst) || xst.st_ino != st.st_ino ||
-		       xst.st_dev != st.st_dev || xst.st_size != st.st_size) {
-		fprintf(stderr, "%s: race condition on write\n", file);
-		err = -2;
-	    }
-	    /* Write our own version ... */
-	    if (xpwrite(fd, syslinux_adv, 2 * ADV_SIZE,
-			st.st_size - 2 * ADV_SIZE) != 2 * ADV_SIZE) {
-		err = -1;
-	    }
-
-	    sync();
-
-	    if (!(st.st_mode & S_IWUSR))
-		fchmod(fd, st.st_mode);
-
-	    if (nflags != flags)
-		ioctl(fd, EXT2_IOC_SETFLAGS, &flags);
-	}
-    }
-
-    if (err == -2)
-	fprintf(stderr, "%s: cannot write auxilliary data (need --update)?\n",
-		file);
-    else if (err == -1)
-	perror(file);
-
-    if (fd >= 0)
-	close(fd);
-    if (file)
-	free(file);
-
-    return err;
-}
-
-/*
- * Make any user-specified ADV modifications
- */
-int modify_adv(void)
-{
-    int rv = 0;
-
-    if (opt.set_once) {
-	if (syslinux_setadv(ADV_BOOTONCE, strlen(opt.set_once), opt.set_once)) {
-	    fprintf(stderr, "%s: not enough space for boot-once command\n",
-		    program);
-	    rv = -1;
-	}
-    }
-
+    free(dirpath);
     return rv;
+}
+
+static int ext_read_adv_offset(int devfd, off_t offset)
+{
+    const size_t adv_size = 2 * ADV_SIZE;
+
+    if (xpread(devfd, syslinux_adv, adv_size, offset) != adv_size)
+      return -1;
+
+    return syslinux_validate_adv(syslinux_adv) ? 1 : 0;
+}
+
+static int ext_read_adv(const char *path, int devfd, const char **namep)
+{
+    int err;
+    const char *name;
+
+    if (fs_type == BTRFS) {
+	/* btrfs "ldlinux.sys" is in 64k blank area */
+	return ext_read_adv_offset(devfd, BTRFS_ADV_OFFSET);
+    } else if (fs_type == XFS) {
+	/* XFS "ldlinux.sys" is in the first 2048 bytes of the primary AG */
+	return ext_read_adv_offset(devfd, boot_image_len);
+    } else {
+	err = read_adv(path, name = "ldlinux.sys");
+	if (err == 2)		/* ldlinux.sys does not exist */
+	    err = read_adv(path, name = "extlinux.sys");
+	if (namep)
+	    *namep = name;
+	return err;
+    }
+}
+
+static int ext_write_adv_offset(int devfd, off_t offset)
+{
+    const size_t adv_size = 2 * ADV_SIZE;
+
+    if (xpwrite(devfd, syslinux_adv, adv_size, offset) != adv_size) {
+	perror("writing adv");
+	return 1;
+    }
+
+    return 0;
+}
+
+static int ext_write_adv(const char *path, const char *cfg, int devfd)
+{
+    if (fs_type == BTRFS) {
+	/* btrfs "ldlinux.sys" is in 64k blank area */
+	return ext_write_adv_offset(devfd, BTRFS_ADV_OFFSET);
+    } else {
+	return write_adv(path, cfg);
+    }
 }
 
 /*
@@ -645,34 +398,182 @@ int modify_adv(void)
 int install_bootblock(int fd, const char *device)
 {
     struct ext2_super_block sb;
+    struct btrfs_super_block sb2;
+    struct fat_boot_sector sb3;
+    struct ntfs_boot_sector sb4;
+    xfs_sb_t sb5;
+    struct ufs_super_block sb6;
+    bool ok = false;
 
-    if (xpread(fd, &sb, sizeof sb, EXT2_SUPER_OFFSET) != sizeof sb) {
-	perror("reading superblock");
+    if (fs_type == EXT2) {
+	if (xpread(fd, &sb, sizeof sb, EXT2_SUPER_OFFSET) != sizeof sb) {
+		perror("reading superblock");
+		return 1;
+	}
+
+	if (sb.s_magic == EXT2_SUPER_MAGIC)
+		ok = true;
+    } else if (fs_type == BTRFS) {
+	if (xpread(fd, &sb2, sizeof sb2, BTRFS_SUPER_INFO_OFFSET)
+			!= sizeof sb2) {
+		perror("reading superblock");
+		return 1;
+	}
+	if (!memcmp(sb2.magic, BTRFS_MAGIC, BTRFS_MAGIC_L))
+		ok = true;
+    } else if (fs_type == VFAT) {
+	if (xpread(fd, &sb3, sizeof sb3, 0) != sizeof sb3) {
+		perror("reading fat superblock");
+		return 1;
+	}
+
+	if (fat_check_sb_fields(&sb3))
+		ok = true;
+    } else if (fs_type == NTFS) {
+        if (xpread(fd, &sb4, sizeof(sb4), 0) != sizeof(sb4)) {
+            perror("reading ntfs superblock");
+            return 1;
+        }
+
+        if (ntfs_check_sb_fields(&sb4))
+             ok = true;
+    } else if (fs_type == XFS) {
+	if (xpread(fd, &sb5, sizeof sb5, 0) != sizeof sb5) {
+	    perror("reading xfs superblock");
+	    return 1;
+	}
+
+	if (sb5.sb_magicnum == *(u32 *)XFS_SB_MAGIC) {
+	    if (be32_to_cpu(sb5.sb_blocksize) != XFS_SUPPORTED_BLOCKSIZE) {
+		fprintf(stderr,
+			"You need to have 4 KiB filesystem block size for"
+			" being able to install Syslinux in your XFS"
+			" partition (because there is not enough space in MBR to"
+			" determine where Syslinux bootsector can be installed"
+			" regardless of the filesystem block size)\n");
+		return 1;
+	    }
+
+	    ok = true;
+	}
+    } else if (fs_type == UFS1 || fs_type == UFS2) {
+	uint32_t sblock_off = (fs_type == UFS1) ?
+	    SBLOCK_UFS1 : SBLOCK_UFS2;
+	uint32_t ufs_smagic = (fs_type == UFS1) ?
+	    UFS1_SUPER_MAGIC : UFS2_SUPER_MAGIC;
+
+	if (xpread(fd, &sb6, sizeof sb6, sblock_off) != sizeof sb6) {
+		perror("reading superblock");
+		return 1;
+	}
+
+	if (sb6.fs_magic == ufs_smagic)
+		ok = true;
+    }
+
+    if (!ok) {
+	fprintf(stderr,
+		"no fat, ntfs, ext2/3/4, btrfs, xfs"
+		" or ufs1/2 superblock found on %s\n",
+		device);
 	return 1;
     }
 
-    if (sb.s_magic != EXT2_SUPER_MAGIC) {
-	fprintf(stderr, "no ext2/ext3 superblock found on %s\n", device);
-	return 1;
-    }
-
-    if (xpwrite(fd, boot_block, boot_block_len, 0) != boot_block_len) {
-	perror("writing bootblock");
-	return 1;
+    if (fs_type == VFAT) {
+	struct fat_boot_sector *sbs = (struct fat_boot_sector *)syslinux_bootsect;
+        if (xpwrite(fd, &sbs->FAT_bsHead, FAT_bsHeadLen, 0) != FAT_bsHeadLen ||
+	    xpwrite(fd, &sbs->FAT_bsCode, FAT_bsCodeLen,
+		    offsetof(struct fat_boot_sector, FAT_bsCode)) != FAT_bsCodeLen) {
+	    perror("writing fat bootblock");
+	    return 1;
+	}
+    } else if (fs_type == NTFS) {
+        struct ntfs_boot_sector *sbs =
+                (struct ntfs_boot_sector *)syslinux_bootsect;
+        if (xpwrite(fd, &sbs->NTFS_bsHead,
+                    NTFS_bsHeadLen, 0) != NTFS_bsHeadLen ||
+                    xpwrite(fd, &sbs->NTFS_bsCode, NTFS_bsCodeLen,
+                    offsetof(struct ntfs_boot_sector,
+                    NTFS_bsCode)) != NTFS_bsCodeLen) {
+            perror("writing ntfs bootblock");
+            return 1;
+        }
+    } else if (fs_type == XFS) {
+	if (xpwrite(fd, syslinux_bootsect, syslinux_bootsect_len,
+		    XFS_BOOTSECT_OFFSET) != syslinux_bootsect_len) {
+	    perror("writing xfs bootblock");
+	    return 1;
+	}
+    } else {
+	if (xpwrite(fd, syslinux_bootsect, syslinux_bootsect_len, 0)
+	    != syslinux_bootsect_len) {
+	    perror("writing bootblock");
+	    return 1;
+	}
     }
 
     return 0;
 }
 
-int install_file(const char *path, int devfd, struct stat *rst)
+static int rewrite_boot_image(int devfd, const char *path, const char *filename)
 {
-    char *file;
-    int fd = -1, dirfd = -1, flags;
-    struct stat st;
+    int fd;
+    int ret;
+    int modbytes;
 
-    asprintf(&file, "%s%sextlinux.sys",
-	     path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
-    if (!file) {
+    /* Let's create LDLINUX.SYS file again (if it already exists, of course) */
+    fd = open(filename,  O_WRONLY | O_TRUNC | O_CREAT | O_SYNC,
+	      S_IRUSR | S_IRGRP | S_IROTH);
+    if (fd < 0) {
+	perror(filename);
+	return -1;
+    }
+
+    /* Write boot image data into LDLINUX.SYS file */
+    ret = xpwrite(fd, (const char _force *)boot_image, boot_image_len, 0);
+    if (ret != boot_image_len) {
+	perror("writing bootblock");
+	goto error;
+    }
+
+    /* Write ADV */
+    if (ext_write_adv_offset(fd, boot_image_len)) {
+	fprintf(stderr, "%s: write failure on %s\n", program, filename);
+	goto error;
+    }
+
+    /* Map the file, and patch the initial sector accordingly */
+    modbytes = patch_file_and_bootblock(fd, path, devfd);
+
+    /* Write the patch area again - this relies on the file being overwritten
+     * in place! */
+    ret = xpwrite(fd, (const char _force *)boot_image, modbytes, 0);
+    if (ret != modbytes) {
+	fprintf(stderr, "%s: write failure on %s\n", program, filename);
+	goto error;
+    }
+
+    return fd;
+
+error:
+    close(fd);
+
+    return -1;
+}
+
+int ext2_fat_install_file(const char *path, int devfd, struct stat *rst)
+{
+    char *file, *oldfile, *c32file;
+    int fd = -1, dirfd = -1;
+    int r1, r2, r3;
+
+    r1 = asprintf(&file, "%s%sldlinux.sys",
+		  path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
+    r2 = asprintf(&oldfile, "%s%sextlinux.sys",
+		  path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
+    r3 = asprintf(&c32file, "%s%sldlinux.c32",
+		  path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
+    if (r1 < 0 || !file || r2 < 0 || !oldfile || r3 < 0 || !c32file) {
 	perror(program);
 	return 1;
     }
@@ -690,51 +591,17 @@ int install_file(const char *path, int devfd, struct stat *rst)
 	    goto bail;
 	}
     } else {
-	/* If file exist, remove the immutable flag and set u+w mode */
-	if (!ioctl(fd, EXT2_IOC_GETFLAGS, &flags)) {
-	    flags &= ~EXT2_IMMUTABLE_FL;
-	    ioctl(fd, EXT2_IOC_SETFLAGS, &flags);
-	}
-	if (!fstat(fd, &st)) {
-	    fchmod(fd, st.st_mode | S_IWUSR);
-	}
+	clear_attributes(fd);
     }
     close(fd);
 
-    fd = open(file, O_WRONLY | O_TRUNC | O_CREAT | O_SYNC,
-	      S_IRUSR | S_IRGRP | S_IROTH);
-    if (fd < 0) {
-	perror(file);
+    fd = rewrite_boot_image(devfd, path, file);
+    if (fd < 0)
 	goto bail;
-    }
-
-    /* Write it the first time */
-    if (xpwrite(fd, boot_image, boot_image_len, 0) != boot_image_len ||
-	xpwrite(fd, syslinux_adv, 2 * ADV_SIZE,
-		boot_image_len) != 2 * ADV_SIZE) {
-	fprintf(stderr, "%s: write failure on %s\n", program, file);
-	goto bail;
-    }
-
-    /* Map the file, and patch the initial sector accordingly */
-    patch_file_and_bootblock(fd, dirfd, devfd);
-
-    /* Write the first sector again - this relies on the file being
-       overwritten in place! */
-    if (xpwrite(fd, boot_image, SECTOR_SIZE, 0) != SECTOR_SIZE) {
-	fprintf(stderr, "%s: write failure on %s\n", program, file);
-	goto bail;
-    }
 
     /* Attempt to set immutable flag and remove all write access */
     /* Only set immutable flag if file is owned by root */
-    if (!fstat(fd, &st)) {
-	fchmod(fd, st.st_mode & (S_IRUSR | S_IRGRP | S_IROTH));
-	if (st.st_uid == 0 && !ioctl(fd, EXT2_IOC_GETFLAGS, &flags)) {
-	    flags |= EXT2_IMMUTABLE_FL;
-	    ioctl(fd, EXT2_IOC_SETFLAGS, &flags);
-	}
-    }
+    set_attributes(fd);
 
     if (fstat(fd, rst)) {
 	perror(file);
@@ -743,6 +610,32 @@ int install_file(const char *path, int devfd, struct stat *rst)
 
     close(dirfd);
     close(fd);
+
+    /* Look if we have the old filename */
+    fd = open(oldfile, O_RDONLY);
+    if (fd >= 0) {
+	clear_attributes(fd);
+	close(fd);
+	unlink(oldfile);
+    }
+
+    fd = open(c32file, O_WRONLY | O_TRUNC | O_CREAT | O_SYNC,
+	      S_IRUSR | S_IRGRP | S_IROTH);
+    if (fd < 0) {
+	perror(c32file);
+	goto bail;
+    }
+
+    r3 = xpwrite(fd, (const char _force *)syslinux_ldlinuxc32,
+		 syslinux_ldlinuxc32_len, 0);
+    if (r3 != syslinux_ldlinuxc32_len) {
+	fprintf(stderr, "%s: write failure on %s\n", program, c32file);
+	goto bail;
+    }
+
+    free(file);
+    free(oldfile);
+    free(c32file);
     return 0;
 
 bail:
@@ -751,17 +644,405 @@ bail:
     if (fd >= 0)
 	close(fd);
 
+    free(file);
+    free(oldfile);
+    free(c32file);
     return 1;
 }
 
-/* EXTLINUX installs the string 'EXTLINUX' at offset 3 in the boot
-   sector; this is consistent with FAT filesystems. */
-int already_installed(int devfd)
+/* btrfs has to install ldlinux.sys to a boot area, which is not managed by
+   btrfs tree, so actually this is not installed as a file, since the cow
+   feature of btrfs would move the ldlinux.sys file everywhere. Older
+   versions installed it to the first 64kiB (aka Boot Area A) but as of
+   commit ID 37eef640 (before 6.03-pre12, before 6.03), it is now in Boot
+   Area B (a 768kiB blank space at offset 256kiB). */
+int btrfs_install_file(const char *path, int devfd, struct stat *rst)
 {
-    char buffer[8];
+    char *file;
+    int fd, rv;
 
-    xpread(devfd, buffer, 8, 3);
-    return !memcmp(buffer, "EXTLINUX", 8);
+    patch_file_and_bootblock(-1, path, devfd);
+    if (xpwrite(devfd, (const char _force *)boot_image,
+		boot_image_len, BTRFS_EXTLINUX_OFFSET)
+		!= boot_image_len) {
+	perror("writing bootblock");
+	return 1;
+    }
+    dprintf("write boot_image to 0x%x\n", BTRFS_EXTLINUX_OFFSET);
+    if (ext_write_adv_offset(devfd, BTRFS_ADV_OFFSET)) {
+	return 1;
+    }
+    dprintf("write adv to 0x%x\n", BTRFS_ADV_OFFSET);
+    if (stat(path, rst)) {
+	perror(path);
+	return 1;
+    }
+
+    /*
+     * Note that we *can* install ldinux.c32 as a regular file because
+     * it doesn't need to be within the first 64K. The Syslinux core
+     * has enough smarts to search the btrfs dirs and find this file.
+     */
+    rv = asprintf(&file, "%s%sldlinux.c32",
+		  path, path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
+    if (rv < 0 || !file) {
+	perror(program);
+	return 1;
+    }
+
+    fd = open(file, O_WRONLY | O_TRUNC | O_CREAT | O_SYNC,
+	      S_IRUSR | S_IRGRP | S_IROTH);
+    if (fd < 0) {
+	perror(file);
+	free(file);
+	return 1;
+    }
+
+    rv = xpwrite(fd, (const char _force *)syslinux_ldlinuxc32,
+		 syslinux_ldlinuxc32_len, 0);
+    if (rv != (int)syslinux_ldlinuxc32_len) {
+	fprintf(stderr, "%s: write failure on %s\n", program, file);
+	rv = 1;
+    } else
+	rv = 0;
+
+    close(fd);
+    free(file);
+    return rv;
+}
+
+/*
+ * Due to historical reasons (SGI IRIX's design of disk layouts), the first
+ * sector in the primary AG on XFS filesystems contains the superblock, which is
+ * a problem with bootloaders that rely on BIOSes (that load VBRs which are
+ * located in the first sector of the partition).
+ *
+ * Thus, we need to handle this issue, otherwise Syslinux will damage the XFS's
+ * superblock.
+ */
+static int xfs_install_file(const char *path, int devfd, struct stat *rst)
+{
+    static char file[PATH_MAX + 1];
+    static char c32file[PATH_MAX + 1];
+    int dirfd = -1;
+    int fd = -1;
+    int retval;
+
+    snprintf(file, PATH_MAX + 1, "%s%sldlinux.sys", path,
+	     path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
+    snprintf(c32file, PATH_MAX + 1, "%s%sldlinux.c32", path,
+	     path[0] && path[strlen(path) - 1] == '/' ? "" : "/");
+
+    dirfd = open(path, O_RDONLY | O_DIRECTORY);
+    if (dirfd < 0) {
+	perror(path);
+	goto bail;
+    }
+
+    fd = open(file, O_RDONLY);
+    if (fd < 0) {
+	if (errno != ENOENT) {
+	    perror(file);
+	    goto bail;
+	}
+    } else {
+	clear_attributes(fd);
+    }
+
+    close(fd);
+
+    fd = rewrite_boot_image(devfd, path, file);
+    if (fd < 0)
+	goto bail;
+
+    /* Attempt to set immutable flag and remove all write access */
+    /* Only set immutable flag if file is owned by root */
+    set_attributes(fd);
+
+    if (fstat(fd, rst)) {
+	perror(file);
+	goto bail;
+    }
+
+    close(dirfd);
+    close(fd);
+
+    dirfd = -1;
+    fd = -1;
+
+    fd = open(c32file, O_WRONLY | O_TRUNC | O_CREAT | O_SYNC,
+	      S_IRUSR | S_IRGRP | S_IROTH);
+    if (fd < 0) {
+	perror(c32file);
+	goto bail;
+    }
+
+    retval = xpwrite(fd, (const char _force *)syslinux_ldlinuxc32,
+		     syslinux_ldlinuxc32_len, 0);
+    if (retval != (int)syslinux_ldlinuxc32_len) {
+	fprintf(stderr, "%s: write failure on %s\n", program, file);
+	goto bail;
+    }
+
+    close(fd);
+
+    sync();
+
+    return 0;
+
+bail:
+    if (dirfd >= 0)
+	close(dirfd);
+
+    if (fd >= 0)
+	close(fd);
+
+    return 1;
+}
+
+/*
+ *  * test if path is a subvolume:
+ *   * this function return
+ *    * 0-> path exists but it is not a subvolume
+ *     * 1-> path exists and it is a subvolume
+ *      * -1 -> path is unaccessible
+ *       */
+static int test_issubvolume(char *path)
+{
+
+        struct stat     st;
+        int             res;
+
+        res = stat(path, &st);
+        if(res < 0 )
+                return -1;
+
+        return (st.st_ino == 256) && S_ISDIR(st.st_mode);
+
+}
+
+/*
+ * Get the default subvolume of a btrfs filesystem
+ *   rootdir: btrfs root dir
+ *   subvol:  this function will save the default subvolume name here
+ */
+static char * get_default_subvol(char * rootdir, char * subvol)
+{
+    struct btrfs_ioctl_search_args args;
+    struct btrfs_ioctl_search_key *sk = &args.key;
+    struct btrfs_ioctl_search_header *sh;
+    int ret, i;
+    int fd;
+    struct btrfs_root_ref *ref;
+    struct btrfs_dir_item *dir_item;
+    unsigned long off = 0;
+    int name_len;
+    char *name;
+    char dirname[4096];
+    u64 defaultsubvolid = 0;
+
+    ret = test_issubvolume(rootdir);
+    if (ret == 1) {
+        fd = open(rootdir, O_RDONLY);
+        if (fd < 0) {
+            fprintf(stderr, "ERROR: failed to open %s\n", rootdir);
+        }
+        ret = fd;
+    }
+    if (ret <= 0) {
+        subvol[0] = '\0';
+        return NULL;
+    }
+
+    memset(&args, 0, sizeof(args));
+
+   /* search in the tree of tree roots */
+   sk->tree_id = 1;
+
+   /*
+    * set the min and max to backref keys.  The search will
+    * only send back this type of key now.
+    */
+   sk->max_type = BTRFS_DIR_ITEM_KEY;
+   sk->min_type = BTRFS_DIR_ITEM_KEY;
+
+   /*
+    * set all the other params to the max, we'll take any objectid
+    * and any trans
+    */
+   sk->min_objectid = BTRFS_ROOT_TREE_DIR_OBJECTID;
+   sk->max_objectid = BTRFS_ROOT_TREE_DIR_OBJECTID;
+
+   sk->max_offset = (u64)-1;
+   sk->min_offset = 0;
+   sk->max_transid = (u64)-1;
+
+   /* just a big number, doesn't matter much */
+   sk->nr_items = 4096;
+
+   while(1) {
+       ret = ioctl(fd, BTRFS_IOC_TREE_SEARCH, &args);
+       if (ret < 0) {
+           fprintf(stderr, "ERROR: can't perform the search\n");
+           subvol[0] = '\0';
+           return NULL;
+       }
+       /* the ioctl returns the number of item it found in nr_items */
+       if (sk->nr_items == 0) {
+           break;
+       }
+
+       off = 0;
+
+       /*
+        * for each item, pull the key out of the header and then
+        * read the root_ref item it contains
+        */
+       for (i = 0; i < sk->nr_items; i++) {
+           sh = (struct btrfs_ioctl_search_header *)(args.buf + off);
+           off += sizeof(*sh);
+           if (sh->type == BTRFS_DIR_ITEM_KEY) {
+               dir_item = (struct btrfs_dir_item *)(args.buf + off);
+               name_len = dir_item->name_len;
+               name = (char *)(dir_item + 1);
+
+
+               /*add_root(&root_lookup, sh->objectid, sh->offset,
+                        dir_id, name, name_len);*/
+               strncpy(dirname, name, name_len);
+               dirname[name_len] = '\0';
+               if (strcmp(dirname, "default") == 0) {
+                   defaultsubvolid = dir_item->location.objectid;
+                   break;
+               }
+           }
+           off += sh->len;
+
+           /*
+            * record the mins in sk so we can make sure the
+            * next search doesn't repeat this root
+            */
+           sk->min_objectid = sh->objectid;
+           sk->min_type = sh->type;
+           sk->max_type = sh->type;
+           sk->min_offset = sh->offset;
+       }
+       if (defaultsubvolid != 0)
+           break;
+       sk->nr_items = 4096;
+       /* this iteration is done, step forward one root for the next
+        * ioctl
+        */
+       if (sk->min_objectid < (u64)-1) {
+           sk->min_objectid = BTRFS_ROOT_TREE_DIR_OBJECTID;
+           sk->max_objectid = BTRFS_ROOT_TREE_DIR_OBJECTID;
+           sk->max_type = BTRFS_ROOT_BACKREF_KEY;
+           sk->min_type = BTRFS_ROOT_BACKREF_KEY;
+           sk->min_offset = 0;
+       } else
+           break;
+   }
+
+   if (defaultsubvolid == 0) {
+       subvol[0] = '\0';
+       return NULL;
+   }
+
+   memset(&args, 0, sizeof(args));
+
+   /* search in the tree of tree roots */
+   sk->tree_id = 1;
+
+   /*
+    * set the min and max to backref keys.  The search will
+    * only send back this type of key now.
+    */
+   sk->max_type = BTRFS_ROOT_BACKREF_KEY;
+   sk->min_type = BTRFS_ROOT_BACKREF_KEY;
+
+   /*
+    * set all the other params to the max, we'll take any objectid
+    * and any trans
+    */
+   sk->max_objectid = (u64)-1;
+   sk->max_offset = (u64)-1;
+   sk->max_transid = (u64)-1;
+
+   /* just a big number, doesn't matter much */
+   sk->nr_items = 4096;
+
+   while(1) {
+       ret = ioctl(fd, BTRFS_IOC_TREE_SEARCH, &args);
+       if (ret < 0) {
+           fprintf(stderr, "ERROR: can't perform the search\n");
+           subvol[0] = '\0';
+           return NULL;
+       }
+       /* the ioctl returns the number of item it found in nr_items */
+       if (sk->nr_items == 0)
+           break;
+
+       off = 0;
+
+       /*
+        * for each item, pull the key out of the header and then
+        * read the root_ref item it contains
+        */
+       for (i = 0; i < sk->nr_items; i++) {
+           sh = (struct btrfs_ioctl_search_header *)(args.buf + off);
+           off += sizeof(*sh);
+           if (sh->type == BTRFS_ROOT_BACKREF_KEY) {
+               ref = (struct btrfs_root_ref *)(args.buf + off);
+               name_len = ref->name_len;
+               name = (char *)(ref + 1);
+
+               if (sh->objectid == defaultsubvolid) {
+                   strncpy(subvol, name, name_len);
+                   subvol[name_len] = '\0';
+                   dprintf("The default subvolume: %s, ID: %llu\n",
+			   subvol, sh->objectid);
+                   break;
+               }
+
+           }
+
+           off += sh->len;
+
+           /*
+            * record the mins in sk so we can make sure the
+            * next search doesn't repeat this root
+            */
+           sk->min_objectid = sh->objectid;
+           sk->min_type = sh->type;
+           sk->min_offset = sh->offset;
+       }
+       if (subvol[0] != '\0')
+           break;
+       sk->nr_items = 4096;
+       /* this iteration is done, step forward one root for the next
+        * ioctl
+        */
+       if (sk->min_objectid < (u64)-1) {
+           sk->min_objectid++;
+           sk->min_type = BTRFS_ROOT_BACKREF_KEY;
+           sk->min_offset = 0;
+       } else
+           break;
+   }
+   return subvol;
+}
+
+static int install_file(const char *path, int devfd, struct stat *rst)
+{
+    if (fs_type == EXT2 || fs_type == VFAT || fs_type == NTFS
+	|| fs_type == UFS1 || fs_type == UFS2)
+	return ext2_fat_install_file(path, devfd, rst);
+    else if (fs_type == BTRFS)
+	return btrfs_install_file(path, devfd, rst);
+    else if (fs_type == XFS)
+	return xfs_install_file(path, devfd, rst);
+
+    return 1;
 }
 
 #ifdef __KLIBC__
@@ -775,135 +1056,463 @@ static void device_cleanup(void)
 
 /* Verify that a device fd and a pathname agree.
    Return 0 on valid, -1 on error. */
+static int validate_device_btrfs(int pathfd, int devfd);
 static int validate_device(const char *path, int devfd)
 {
     struct stat pst, dst;
+    struct statfs sfs;
+    int pfd;
+    int rv = -1;
 
-    if (stat(path, &pst) || fstat(devfd, &dst))
-	return -1;
+    pfd = open(path, O_RDONLY|O_DIRECTORY);
+    if (pfd < 0)
+	goto err;
 
-    return (pst.st_dev == dst.st_rdev) ? 0 : -1;
+    if (fstat(pfd, &pst) || fstat(devfd, &dst) || statfs(path, &sfs))
+	goto err;
+
+    /* btrfs st_dev is not matched with mnt st_rdev, it is a known issue */
+    if (fs_type == BTRFS) {
+	if (sfs.f_type == BTRFS_SUPER_MAGIC)
+	    rv = validate_device_btrfs(pfd, devfd);
+    } else {
+	rv = (pst.st_dev == dst.st_rdev) ? 0 : -1;
+    }
+
+err:
+    if (pfd >= 0)
+	close(pfd);
+    return rv;
 }
 
 #ifndef __KLIBC__
-static const char *find_device(const char *mtab_file, dev_t dev)
+static char *find_device(const char *mtab_file, dev_t dev)
 {
     struct mntent *mnt;
     struct stat dst;
     FILE *mtab;
-    const char *devname = NULL;
+    char *devname = NULL;
+    bool done;
 
     mtab = setmntent(mtab_file, "r");
     if (!mtab)
 	return NULL;
 
+    done = false;
     while ((mnt = getmntent(mtab))) {
-	if ((!strcmp(mnt->mnt_type, "ext2") ||
-	     !strcmp(mnt->mnt_type, "ext3")) &&
-	    !stat(mnt->mnt_fsname, &dst) && dst.st_rdev == dev) {
+	/* btrfs st_dev is not matched with mnt st_rdev, it is a known issue */
+	switch (fs_type) {
+	case BTRFS:
+	    if (!strcmp(mnt->mnt_type, "btrfs") &&
+		!stat(mnt->mnt_dir, &dst) &&
+		dst.st_dev == dev) {
+		if (!subvol[0])
+		    get_default_subvol(mnt->mnt_dir, subvol);
+		done = true;
+	    }
+	    break;
+	case EXT2:
+	    if ((!strcmp(mnt->mnt_type, "ext2") ||
+		 !strcmp(mnt->mnt_type, "ext3") ||
+		 !strcmp(mnt->mnt_type, "ext4")) &&
+		!stat(mnt->mnt_fsname, &dst) &&
+		dst.st_rdev == dev) {
+		done = true;
+		break;
+	    }
+	case VFAT:
+	    if ((!strcmp(mnt->mnt_type, "vfat")) &&
+		!stat(mnt->mnt_fsname, &dst) &&
+		dst.st_rdev == dev) {
+		done = true;
+		break;
+	    }
+	case NTFS:
+	    if ((!strcmp(mnt->mnt_type, "fuseblk") /* ntfs-3g */ ||
+		 !strcmp(mnt->mnt_type, "ntfs")) &&
+		!stat(mnt->mnt_fsname, &dst) &&
+		dst.st_rdev == dev) {
+		done = true;
+		break;
+	    }
+
+	    break;
+	case XFS:
+	    if (!strcmp(mnt->mnt_type, "xfs") && !stat(mnt->mnt_fsname, &dst) &&
+		dst.st_rdev == dev) {
+		done = true;
+		break;
+	    }
+
+	    break;
+	case UFS1:
+	case UFS2:
+	    if (!strcmp(mnt->mnt_type, "ufs") && !stat(mnt->mnt_fsname, &dst) &&
+		dst.st_rdev == dev) {
+		done = true;
+	    }
+
+	    break;
+	case NONE:
+	    break;
+	}
+
+	if (done) {
 	    devname = strdup(mnt->mnt_fsname);
 	    break;
 	}
     }
+
     endmntent(mtab);
 
     return devname;
 }
 #endif
 
-int install_loader(const char *path, int update_only)
+/*
+ * On newer Linux kernels we can use sysfs to get a backwards mapping
+ * from device names to standard filenames
+ */
+static char *find_device_sysfs(dev_t dev)
 {
-    struct stat st, fst;
-    int devfd, rv;
-    const char *devname = NULL;
+    char sysname[64];
+    char linkname[PATH_MAX];
+    ssize_t llen;
+    char *p, *q;
+    char *buf = NULL;
+    struct stat st;
+
+    snprintf(sysname, sizeof sysname, "/sys/dev/block/%u:%u",
+	     major(dev), minor(dev));
+
+    llen = readlink(sysname, linkname, sizeof linkname);
+    if (llen < 0 || llen >= sizeof linkname)
+	goto err;
+
+    linkname[llen] = '\0';
+
+    p = strrchr(linkname, '/');
+    p = p ? p+1 : linkname;	/* Leave basename */
+
+    buf = q = malloc(strlen(p) + 6);
+    if (!buf)
+	goto err;
+
+    memcpy(q, "/dev/", 5);
+    q += 5;
+
+    while (*p) {
+	*q++ = (*p == '!') ? '/' : *p;
+	p++;
+    }
+
+    *q = '\0';
+
+    if (!stat(buf, &st) && st.st_dev == dev)
+	return buf;		/* Found it! */
+
+err:
+    if (buf)
+	free(buf);
+    return NULL;
+}
+
+static const char *find_device_mountinfo(const char *path, dev_t dev)
+{
+    const struct mountinfo *m;
+    struct stat st;
+
+    m = find_mount(path, NULL);
+    if (!m)
+	return NULL;
+
+    if (m->devpath[0] == '/' && m->dev == dev &&
+	!stat(m->devpath, &st) && S_ISBLK(st.st_mode) && st.st_rdev == dev)
+	return m->devpath;
+    else
+	return NULL;
+}
+
+static int validate_device_btrfs(int pfd, int dfd)
+{
+    struct btrfs_ioctl_fs_info_args fsinfo;
+    static struct btrfs_ioctl_dev_info_args devinfo;
+    struct btrfs_super_block sb2;
+
+    if (ioctl(pfd, BTRFS_IOC_FS_INFO, &fsinfo))
+	return -1;
+
+    /* We do not support multi-device btrfs yet */
+    if (fsinfo.num_devices != 1)
+	return -1;
+
+    /* The one device will have the max devid */
+    memset(&devinfo, 0, sizeof devinfo);
+    devinfo.devid = fsinfo.max_id;
+    if (ioctl(pfd, BTRFS_IOC_DEV_INFO, &devinfo))
+	return -1;
+
+    if (devinfo.path[0] != '/')
+	return -1;
+
+    if (xpread(dfd, &sb2, sizeof sb2, BTRFS_SUPER_INFO_OFFSET) != sizeof sb2)
+	return -1;
+
+    if (memcmp(sb2.magic, BTRFS_MAGIC, BTRFS_MAGIC_L))
+	return -1;
+
+    if (memcmp(sb2.fsid, fsinfo.fsid, sizeof fsinfo.fsid))
+	return -1;
+
+    if (sb2.num_devices != 1)
+	return -1;
+
+    if (sb2.dev_item.devid != devinfo.devid)
+	return -1;
+
+    if (memcmp(sb2.dev_item.uuid, devinfo.uuid, sizeof devinfo.uuid))
+	return -1;
+
+    if (memcmp(sb2.dev_item.fsid, fsinfo.fsid, sizeof fsinfo.fsid))
+	return -1;
+
+    return 0;			/* It's good! */
+}
+
+static const char *find_device_btrfs(const char *path)
+{
+    int pfd, dfd;
+    struct btrfs_ioctl_fs_info_args fsinfo;
+    static struct btrfs_ioctl_dev_info_args devinfo;
+    const char *rv = NULL;
+
+    pfd = dfd = -1;
+
+    pfd = open(path, O_RDONLY);
+    if (pfd < 0)
+	goto err;
+
+    if (ioctl(pfd, BTRFS_IOC_FS_INFO, &fsinfo))
+	goto err;
+
+    /* We do not support multi-device btrfs yet */
+    if (fsinfo.num_devices != 1)
+	goto err;
+
+    /* The one device will have the max devid */
+    memset(&devinfo, 0, sizeof devinfo);
+    devinfo.devid = fsinfo.max_id;
+    if (ioctl(pfd, BTRFS_IOC_DEV_INFO, &devinfo))
+	goto err;
+
+    if (devinfo.path[0] != '/')
+	goto err;
+
+    dfd = open((const char *)devinfo.path, O_RDONLY);
+    if (dfd < 0)
+	goto err;
+
+    if (!validate_device_btrfs(pfd, dfd))
+	rv = (const char *)devinfo.path; /* It's good! */
+
+err:
+    if (pfd >= 0)
+	close(pfd);
+    if (dfd >= 0)
+	close(dfd);
+    return rv;
+}
+
+static char *dupname(const char *name)
+{
+    char *out = NULL;
+    int len = 0;
+    if (name)
+        len = strlen(name);
+    if (len > 0)
+        out = strndup(name, len);
+    return out;
+}
+
+static char *get_devname(const char *path)
+{
+    char *devname = NULL;
+    struct stat st;
     struct statfs sfs;
 
     if (stat(path, &st) || !S_ISDIR(st.st_mode)) {
 	fprintf(stderr, "%s: Not a directory: %s\n", program, path);
-	return 1;
+	return devname;
     }
-
     if (statfs(path, &sfs)) {
 	fprintf(stderr, "%s: statfs %s: %s\n", program, path, strerror(errno));
-	return 1;
+	return devname;
     }
 
-    if (sfs.f_type != EXT2_SUPER_MAGIC) {
-	fprintf(stderr, "%s: not an ext2/ext3 filesystem: %s\n", program, path);
-	return 1;
+    if (opt.device)
+	devname = strdup(opt.device);
+
+    if (!devname){
+	if (fs_type == BTRFS) {
+	    /* For btrfs try to get the device name from btrfs itself */
+	    devname = dupname(find_device_btrfs(path));
+	}
     }
 
-    devfd = -1;
+    if (!devname) {
+	devname = dupname(find_device_mountinfo(path, st.st_dev));
+    }
 
 #ifdef __KLIBC__
-
-    /* klibc doesn't have getmntent and friends; instead, just create
-       a new device with the appropriate device type */
-    snprintf(devname_buf, sizeof devname_buf, "/tmp/dev-%u:%u",
-	     major(st.st_dev), minor(st.st_dev));
-
-    if (mknod(devname_buf, S_IFBLK | 0600, st.st_dev)) {
-	fprintf(stderr, "%s: cannot create device %s\n", program, devname);
-	return 1;
+    if (!devname) {
+	devname = find_device_sysfs(st.st_dev);
     }
+    if (!devname) {
+	/* klibc doesn't have getmntent and friends; instead, just create
+	   a new device with the appropriate device type */
+	snprintf(devname_buf, sizeof devname_buf, "/tmp/dev-%u:%u",
+		 major(st.st_dev), minor(st.st_dev));
 
-    atexit(device_cleanup);	/* unlink the device node on exit */
-    devname = devname_buf;
+	if (mknod(devname_buf, S_IFBLK | 0600, st.st_dev)) {
+	    fprintf(stderr, "%s: cannot create device %s\n", program, devname);
+	    return devname;
+	}
+
+	atexit(device_cleanup);	/* unlink the device node on exit */
+	devname = dupname(devname_buf);
+    }
 
 #else
-
-    devname = find_device("/proc/mounts", st.st_dev);
     if (!devname) {
-	/* Didn't find it in /proc/mounts, try /etc/mtab */
-	devname = find_device("/etc/mtab", st.st_dev);
+	devname = find_device("/proc/mounts", st.st_dev);
     }
     if (!devname) {
+	/* Didn't find it in /proc/mounts, try /etc/mtab */
+        devname = find_device("/etc/mtab", st.st_dev);
+    }
+    if (!devname) {
+	devname = find_device_sysfs(st.st_dev);
+
 	fprintf(stderr, "%s: cannot find device for path %s\n", program, path);
-	return 1;
+	return devname;
     }
 
     fprintf(stderr, "%s is device %s\n", path, devname);
+
 #endif
+    return devname;
+}
+
+static int open_device(const char *path, struct stat *st, char **_devname)
+{
+    int devfd;
+    char *devname = NULL;
+    struct statfs sfs;
+
+    if (st)
+	if (stat(path, st) || !S_ISDIR(st->st_mode)) {
+		fprintf(stderr, "%s: Not a directory: %s\n", program, path);
+		return -1;
+	}
+
+    if (statfs(path, &sfs)) {
+	fprintf(stderr, "%s: statfs %s: %s\n", program, path, strerror(errno));
+	return -1;
+    }
+
+    if (sfs.f_type == EXT2_SUPER_MAGIC)
+	fs_type = EXT2;
+    else if (sfs.f_type == BTRFS_SUPER_MAGIC)
+	fs_type = BTRFS;
+    else if (sfs.f_type == MSDOS_SUPER_MAGIC)
+	fs_type = VFAT;
+    else if (sfs.f_type == NTFS_SB_MAGIC ||
+                sfs.f_type == FUSE_SUPER_MAGIC /* ntfs-3g */)
+	fs_type = NTFS;
+    else if (sfs.f_type == XFS_SUPER_MAGIC)
+	fs_type = XFS;
+    else if (sfs.f_type == UFS1_SUPER_MAGIC)
+	fs_type = UFS1;
+    else if (sfs.f_type == UFS2_SUPER_MAGIC)
+	fs_type = UFS2;
+
+    if (!fs_type) {
+	fprintf(stderr,
+		"%s: not a fat, ntfs, ext2/3/4, btrfs, xfs"
+		" or ufs1/2 filesystem: %s\n",
+		program, path);
+	return -1;
+    }
+
+    devfd = -1;
+    devname = get_devname(path);
 
     if ((devfd = open(devname, O_RDWR | O_SYNC)) < 0) {
 	fprintf(stderr, "%s: cannot open device %s\n", program, devname);
-	return 1;
+	free(devname);
+	return -1;
     }
 
     /* Verify that the device we opened is the device intended */
     if (validate_device(path, devfd)) {
 	fprintf(stderr, "%s: path %s doesn't match device %s\n",
 		program, path, devname);
-	return 1;
+	free(devname);
+	close(devfd);
+	return -1;
     }
+    if (_devname)
+        *_devname = devname;
+    else
+        free(devname);
+    return devfd;
+}
 
-    if (update_only && !already_installed(devfd)) {
-	fprintf(stderr, "%s: no previous extlinux boot sector found\n",
+static int install_loader(const char *path, int update_only)
+{
+    struct stat st, fst;
+    int devfd, rv;
+    char *devname = NULL;
+
+    devfd = open_device(path, &st, &devname);
+    if (devfd < 0)
+	return 1;
+
+    if (update_only && !syslinux_already_installed(devfd)) {
+	fprintf(stderr, "%s: no previous syslinux boot sector found\n",
 		program);
+	close(devfd);
 	return 1;
     }
 
     /* Read a pre-existing ADV, if already installed */
-    if (opt.reset_adv)
+    if (opt.reset_adv) {
 	syslinux_reset_adv(syslinux_adv);
-    else if (read_adv(path) < 0)
+    } else if (ext_read_adv(path, devfd, NULL) < 0) {
+	close(devfd);
 	return 1;
+    }
 
-    if (modify_adv() < 0)
+    if (modify_adv() < 0) {
+	close(devfd);
 	return 1;
+    }
 
-    /* Install extlinux.sys */
-    if (install_file(path, devfd, &fst))
+    /* Install ldlinux.sys */
+    if (install_file(path, devfd, &fst)) {
+	close(devfd);
 	return 1;
-
+    }
     if (fst.st_dev != st.st_dev) {
 	fprintf(stderr, "%s: file system changed under us - aborting!\n",
 		program);
+	close(devfd);
 	return 1;
     }
 
     sync();
     rv = install_bootblock(devfd, devname);
+    free(devname);
     close(devfd);
     sync();
 
@@ -915,96 +1524,42 @@ int install_loader(const char *path, int update_only)
  */
 int modify_existing_adv(const char *path)
 {
-    if (opt.reset_adv)
-	syslinux_reset_adv(syslinux_adv);
-    else if (read_adv(path) < 0)
+    const char *filename;
+    int devfd;
+
+    devfd = open_device(path, NULL, NULL);
+    if (devfd < 0)
 	return 1;
 
-    if (modify_adv() < 0)
+    if (ext_read_adv(path, devfd, &filename) < 0) {
+	close(devfd);
 	return 1;
-
-    if (write_adv(path) < 0)
+    }
+    if (modify_adv() < 0) {
+	close(devfd);
 	return 1;
-
+    }
+    if (ext_write_adv(path, filename, devfd) < 0) {
+	close(devfd);
+	return 1;
+    }
+    close(devfd);
     return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    int o;
-    const char *directory;
-    int update_only = -1;
+    parse_options(argc, argv, MODE_EXTLINUX);
 
-    program = argv[0];
+    if (!opt.directory || opt.install_mbr || opt.activate_partition)
+	usage(EX_USAGE, 0);
 
-    while ((o = getopt_long(argc, argv, short_options,
-			    long_options, NULL)) != EOF) {
-	switch (o) {
-	case 'z':
-	    opt.heads = 64;
-	    opt.sectors = 32;
-	    break;
-	case 'S':
-	    opt.sectors = strtoul(optarg, NULL, 0);
-	    if (opt.sectors < 1 || opt.sectors > 63) {
-		fprintf(stderr,
-			"%s: invalid number of sectors: %u (must be 1-63)\n",
-			program, opt.sectors);
-		exit(EX_USAGE);
-	    }
-	    break;
-	case 'H':
-	    opt.heads = strtoul(optarg, NULL, 0);
-	    if (opt.heads < 1 || opt.heads > 256) {
-		fprintf(stderr,
-			"%s: invalid number of heads: %u (must be 1-256)\n",
-			program, opt.heads);
-		exit(EX_USAGE);
-	    }
-	    break;
-	case 'r':
-	    opt.raid_mode = 1;
-	    break;
-	case 'i':
-	    update_only = 0;
-	    break;
-	case 'u':
-	case 'U':
-	    update_only = 1;
-	    break;
-	case 'h':
-	    usage(0);
-	    break;
-	case 'o':
-	    opt.set_once = optarg;
-	    break;
-	case 'O':
-	    opt.set_once = "";
-	    break;
-	case OPT_RESET_ADV:
-	    opt.reset_adv = 1;
-	    break;
-	case 'v':
-	    fputs("extlinux " VERSION_STR
-		  "  Copyright 1994-" YEAR_STR " H. Peter Anvin \n", stderr);
-	    exit(0);
-	default:
-	    usage(EX_USAGE);
-	}
+    if (opt.update_only == -1) {
+	if (opt.reset_adv || opt.set_once || opt.menu_save)
+	    return modify_existing_adv(opt.directory);
+	else
+	    usage(EX_USAGE, MODE_EXTLINUX);
     }
 
-    directory = argv[optind];
-
-    if (!directory)
-	usage(EX_USAGE);
-
-    if (update_only == -1) {
-	if (opt.reset_adv || opt.set_once) {
-	    return modify_existing_adv(directory);
-	} else {
-	    usage(EX_USAGE);
-	}
-    }
-
-    return install_loader(directory, update_only);
+    return install_loader(opt.directory, opt.update_only);
 }

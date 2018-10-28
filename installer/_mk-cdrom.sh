@@ -1,4 +1,5 @@
 #!/bin/bash
+# From: https://wiki.debian.org/RepackBootableISO
 
 usage()
 {
@@ -8,14 +9,15 @@ usage()
 
 [ -z $1 ] && usage
 
-mkisofs -T -r -b isolinux/isolinux.bin \
-        -c isolinux/boot.catalog \
-        -no-emul-boot \
-        -boot-load-size 4 \
-        -boot-info-table \
-	    -V Comodoo-POS-Installer \
-	    -o cd.iso \
-	    $1
-
-
+xorriso -as mkisofs \
+   -r -V 'Comodoo POS Installer' \
+   -o cd.iso \
+   -J -J -joliet-long -cache-inodes \
+   -isohybrid-mbr syslinux/efi64/mbr/isohdpfx.bin \
+   -b isolinux/isolinux.bin \
+   -c isolinux/boot.cat \
+   -boot-load-size 4 -boot-info-table -no-emul-boot \
+   -eltorito-alt-boot \
+   -no-emul-boot -isohybrid-gpt-basdat -isohybrid-apm-hfsplus \
+   $1
 

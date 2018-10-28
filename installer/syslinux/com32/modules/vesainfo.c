@@ -20,25 +20,32 @@ static void wait_key(void)
 
 static void print_modes(void)
 {
-    static com32sys_t rm;
-    struct vesa_general_info *gi;
-    struct vesa_mode_info *mi;
-    uint16_t mode, *mode_ptr;
-    int lines;
+	static com32sys_t rm;
+	struct vesa_general_info *gi;
+	struct vesa_mode_info *mi;
+	uint16_t mode, *mode_ptr;
+	int lines;
 
-    /* Allocate space in the bounce buffer for these structures */
-    gi = &((struct vesa_info *)__com32.cs_bounce)->gi;
-    mi = &((struct vesa_info *)__com32.cs_bounce)->mi;
+	struct vesa_info *vesa;
 
-    gi->signature = VBE2_MAGIC;	/* Get VBE2 extended data */
-    rm.eax.w[0] = 0x4F00;	/* Get SVGA general information */
-    rm.edi.w[0] = OFFS(gi);
-    rm.es = SEG(gi);
-    __intcall(0x10, &rm, &rm);
+	vesa = lmalloc(sizeof(*vesa));
+	if (!vesa) {
+		printf("vesainfo.c32: fail in lmalloc\n");
+		return;
+	}
+	gi = &vesa->gi;
+	mi = &vesa->mi;
+
+        memset(&rm, 0, sizeof rm);
+	gi->signature = VBE2_MAGIC;	/* Get VBE2 extended data */
+	rm.eax.w[0] = 0x4F00;	/* Get SVGA general information */
+	rm.edi.w[0] = OFFS(gi);
+	rm.es = SEG(gi);
+	__intcall(0x10, &rm, &rm);
 
     if (rm.eax.w[0] != 0x004F) {
 	printf("No VESA BIOS detected\n");
-	return;
+	goto exit;
     } else if (gi->signature != VESA_MAGIC) {
 	printf("VESA information structure has bad magic, trying anyway...\n");
     }
@@ -57,6 +64,7 @@ static void print_modes(void)
 	    lines = 0;
 	}
 
+        memset(&rm, 0, sizeof rm);
 	rm.eax.w[0] = 0x4F01;	/* Get SVGA mode information */
 	rm.ecx.w[0] = mode;
 	rm.edi.w[0] = OFFS(mi);
@@ -71,12 +79,14 @@ static void print_modes(void)
 	       mode, mi->mode_attr, mi->h_res, mi->v_res, mi->bpp,
 	       mi->memory_layout, mi->rpos, mi->gpos, mi->bpos);
     }
+
+exit:
+	lfree(vesa);
+	return;
 }
 
-int main(void)
+int main(int argc __unused, char **argv __unused)
 {
-    openconsole(&dev_rawcon_r, &dev_stdcon_w);
-
     print_modes();
     return 0;
 }

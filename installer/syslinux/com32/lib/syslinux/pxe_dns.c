@@ -43,28 +43,25 @@
    or -1 on invocation failure */
 uint32_t pxe_dns(const char *hostname)
 {
-    com32sys_t regs;
     union {
 	unsigned char b[4];
 	uint32_t ip;
     } q;
+    char *lm_hostname;
+    uint32_t status;
 
     /* Is this a dot-quad? */
     if (sscanf(hostname, "%hhu.%hhu.%hhu.%hhu",
 	       &q.b[0], &q.b[1], &q.b[2], &q.b[3]) == 4)
 	return q.ip;
 
-    memset(&regs, 0, sizeof regs);
-    regs.eax.w[0] = 0x0010;
-    regs.es = SEG(__com32.cs_bounce);
-    regs.ebx.w[0] = OFFS(__com32.cs_bounce);
-
-    strcpy((char *)__com32.cs_bounce, hostname);
-
-    __intcall(0x22, &regs, &regs);
-
-    if (regs.eflags.l & EFLAGS_CF)
+    lm_hostname = lstrdup(hostname);
+    if (!lm_hostname)
 	return 0;
 
-    return regs.eax.l;
+    status = dns_resolv(lm_hostname);
+
+    lfree(lm_hostname);
+
+    return status;
 }

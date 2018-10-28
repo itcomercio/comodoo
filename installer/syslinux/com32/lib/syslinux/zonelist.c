@@ -39,21 +39,7 @@
 #include <stdlib.h>
 #include <syslinux/align.h>
 #include <syslinux/movebits.h>
-
-#ifndef DEBUG
-# ifdef TEST
-#  define DEBUG 1
-# else
-#  define DEBUG 0
-# endif
-#endif
-
-#if DEBUG
-# include <stdio.h>
-# define dprintf printf
-#else
-# define dprintf(...) ((void)0)
-#endif
+#include <dprintf.h>
 
 /*
  * Create an empty syslinux_memmap list.
@@ -96,10 +82,8 @@ int syslinux_add_memmap(struct syslinux_memmap **list,
     struct syslinux_memmap *range;
     enum syslinux_memmap_types oldtype;
 
-#if DEBUG
     dprintf("Input memmap:\n");
-    syslinux_dump_memmap(stdout, *list);
-#endif
+    syslinux_dump_memmap(*list);
 
     /* Remove this to make len == 0 mean all of memory */
     if (len == 0)
@@ -164,17 +148,16 @@ int syslinux_add_memmap(struct syslinux_memmap **list,
 	}
     }
 
-#if DEBUG
     dprintf("After adding (%#x,%#x,%d):\n", start, len, type);
-    syslinux_dump_memmap(stdout, *list);
-#endif
+    syslinux_dump_memmap(*list);
 
     return 0;
 }
 
 /*
  * Verify what type a certain memory region is.  This function returns
- * SMT_ERROR if the memory region has multiple types.
+ * SMT_ERROR if the memory region has multiple types, except that
+ * SMT_FREE can be demoted to SMT_TERMINAL.
  */
 enum syslinux_memmap_types syslinux_memmap_type(struct syslinux_memmap *list,
 						addr_t start, addr_t len)
@@ -186,10 +169,18 @@ enum syslinux_memmap_types syslinux_memmap_type(struct syslinux_memmap *list,
     while (list->type != SMT_END) {
 	llast = list->next->start - 1;
 	if (list->start <= start) {
-	    if (llast >= last)
+	    if (llast >= last) {
 		return list->type;	/* Region has a well-defined type */
-	    else if (llast >= start)
-		return SMT_ERROR;	/* Crosses region boundary */
+	    } else if (llast >= start) {
+		/* Crosses region boundary */
+		while (valid_terminal_type(list->type)) {
+		    list = list->next;
+		    llast = list->next->start - 1;
+		    if (llast >= last)
+			return SMT_TERMINAL;
+		}
+		return SMT_ERROR;
+	    }
 	}
 	list = list->next;
     }
@@ -228,13 +219,58 @@ int syslinux_memmap_largest(struct syslinux_memmap *list,
 }
 
 /*
+ * Find the highest zone of a specific type that satisfies the
+ * constraints.
+ *
+ * 'start' is updated with the highest address on success. 'start' can
+ * be used to set a minimum address to begin searching from.
+ *
+ * Returns -1 on failure.
+ */
+int syslinux_memmap_highest(const struct syslinux_memmap *list,
+			    enum syslinux_memmap_types type,
+			    addr_t *start, addr_t len,
+			    addr_t ceiling, addr_t align)
+{
+    addr_t size, best;
+
+    for (best = 0; list->type != SMT_END; list = list->next) {
+	size = list->next->start - list->start;
+
+	if (list->type != type)
+	    continue;
+
+	if (list->start + size <= *start)
+	    continue;
+
+	if (list->start + len >= ceiling)
+	    continue;
+
+	if (list->start + size < ceiling)
+	    best = ALIGN_DOWN(list->start + size - len, align);
+	else
+	    best = ALIGN_DOWN(ceiling - len, align);
+
+	if (best < *start)
+	    best = 0;
+    }
+
+    if (!best)
+	return -1;
+
+    *start = best;
+
+    return 0;
+}
+
+/*
  * Find the first (lowest address) zone of a specific type and of
  * a certain minimum size, with an optional starting address.
  * The input values of start and len are used as minima.
  */
-int syslinux_memmap_find(struct syslinux_memmap *list,
-			 enum syslinux_memmap_types type,
-			 addr_t * start, addr_t * len, addr_t align)
+int syslinux_memmap_find_type(struct syslinux_memmap *list,
+			      enum syslinux_memmap_types type,
+			      addr_t * start, addr_t * len, addr_t align)
 {
     addr_t min_start = *start;
     addr_t min_len = *len;
@@ -298,4 +334,69 @@ struct syslinux_memmap *syslinux_dup_memmap(struct syslinux_memmap *list)
     }
 
     return newlist;
+}
+
+/*
+ * Find a memory region, given a set of heuristics and update 'base' if
+ * successful.
+ */
+int syslinux_memmap_find(struct syslinux_memmap *mmap,
+			 addr_t *base, size_t size,
+			 bool relocate, size_t align,
+			 addr_t start_min, addr_t start_max,
+			 addr_t end_min, addr_t end_max)
+{
+    const struct syslinux_memmap *mp;
+    enum syslinux_memmap_types type;
+    bool ok;
+
+    if (!size)
+	return 0;
+
+    type = syslinux_memmap_type(mmap, *base, size);
+
+    /* This assumes SMT_TERMINAL is OK if we can get the exact address */
+    if (valid_terminal_type(type))
+	return 0;
+
+    if (!relocate) {
+	dprintf("Cannot relocate\n");
+	return -1;
+    }
+
+    ok = false;
+    for (mp = mmap; mp && mp->type != SMT_END; mp = mp->next) {
+	addr_t start, end;
+	start = mp->start;
+	end = mp->next->start;
+
+	if (mp->type != SMT_FREE)
+	    continue;
+
+	/* min */
+	if (end <= end_min)
+	    continue;	/* Only relocate upwards */
+
+	if (start < start_min)
+	    start = start_min;
+
+	/* max */
+	if (end > end_max)
+	    end = end_max;
+
+	start = ALIGN_UP(start, align);
+	if (start > start_max || start >= end)
+	    continue;
+
+	if (end - start >= size) {
+	    *base = start;
+	    ok = true;
+	    break;
+	}
+    }
+
+    if (!ok)
+	return -1;
+
+    return 0;
 }

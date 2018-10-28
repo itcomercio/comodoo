@@ -48,21 +48,7 @@
 #include <stdbool.h>
 
 #include <syslinux/movebits.h>
-
-#ifndef DEBUG
-# ifdef TEST
-#  define DEBUG 1
-# else
-#  define DEBUG 0
-# endif
-#endif
-
-#if DEBUG
-# include <stdio.h>
-# define dprintf printf
-#else
-# define dprintf(...) ((void)0)
-#endif
+#include <dprintf.h>
 
 static jmp_buf new_movelist_bail;
 
@@ -157,32 +143,31 @@ static void free_movelist(struct syslinux_movelist **parentptr)
 }
 
 /*
- * Scan the freelist looking for a particular chunk of memory
+ * Scan the freelist looking for a particular chunk of memory.  Returns
+ * the memmap chunk containing to the first byte of the region.
  */
 static const struct syslinux_memmap *is_free_zone(const struct syslinux_memmap
 						  *list, addr_t start,
 						  addr_t len)
 {
-    dprintf("f: 0x%08x bytes at 0x%08x\n", len, start);
-
     addr_t last, llast;
+
+    dprintf("f: 0x%08x bytes at 0x%08x\n", len, start);
 
     last = start + len - 1;
 
     while (list->type != SMT_END) {
-	llast = list->next->start - 1;
 	if (list->start <= start) {
-	    if (llast >= last) {
-		/* Chunk has a single, well-defined type */
-		if (list->type == SMT_FREE) {
-		    dprintf("F: 0x%08x bytes at 0x%08x\n",
-			    list->next->start, list->start);
-		    return list;	/* It's free */
-		}
-		return NULL;	/* Not free */
-	    } else if (llast >= start) {
-		return NULL;	/* Crosses region boundary */
+	    const struct syslinux_memmap *ilist = list;
+	    while (valid_terminal_type(list->type)) {
+		llast = list->next->start - 1;
+		if (llast >= last)
+		    return ilist;
+		list = list->next;
 	    }
+
+	    if (list->start > start)
+		return NULL;	/* Invalid type in region */
 	}
 	list = list->next;
     }
@@ -242,10 +227,8 @@ static void shuffle_dealias(struct syslinux_movelist **fraglist,
     addr_t ps, pe, xs, xe, delta;
     bool advance;
 
-#if DEBUG
     dprintf("Before alias resolution:\n");
-    syslinux_dump_movelist(stdout, *fraglist);
-#endif
+    syslinux_dump_movelist(*fraglist);
 
     *postcopy = NULL;
 
@@ -316,12 +299,10 @@ restart:
 	;
     }
 
-#if DEBUG
     dprintf("After alias resolution:\n");
-    syslinux_dump_movelist(stdout, *fraglist);
+    syslinux_dump_movelist(*fraglist);
     dprintf("Post-shuffle copies:\n");
-    syslinux_dump_movelist(stdout, *postcopy);
-#endif
+    syslinux_dump_movelist(*postcopy);
 }
 
 /*
@@ -449,12 +430,10 @@ nomem:
     /* As long as there are unprocessed fragments in the chain... */
     while ((fp = &frags, f = *fp)) {
 
-#if DEBUG
 	dprintf("Current free list:\n");
-	syslinux_dump_memmap(stdout, mmap);
+	syslinux_dump_memmap(mmap);
 	dprintf("Current frag list:\n");
-	syslinux_dump_movelist(stdout, frags);
-#endif
+	syslinux_dump_movelist(frags);
 
 	/* Scan for fragments which can be discarded without action. */
 	if (f->src == f->dst) {
@@ -692,17 +671,17 @@ int main(int argc, char *argv[])
 
     *fep = NULL;
 
-    printf("Input move list:\n");
-    syslinux_dump_movelist(stdout, frags);
-    printf("Input free list:\n");
-    syslinux_dump_memmap(stdout, memmap);
+    dprintf("Input move list:\n");
+    syslinux_dump_movelist(frags);
+    dprintf("Input free list:\n");
+    syslinux_dump_memmap(memmap);
 
     if (syslinux_compute_movelist(&moves, frags, memmap)) {
 	printf("Failed to compute a move sequence\n");
 	return 1;
     } else {
-	printf("Final move list:\n");
-	syslinux_dump_movelist(stdout, moves);
+	dprintf("Final move list:\n");
+	syslinux_dump_movelist(moves);
 	return 0;
     }
 }

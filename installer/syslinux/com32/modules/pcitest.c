@@ -39,12 +39,7 @@
 #include <com32.h>
 #include <sys/pci.h>
 #include <stdbool.h>
-
-#ifdef DEBUG
-# define dprintf printf
-#else
-# define dprintf(...) ((void)0)
-#endif
+#include <dprintf.h>
 
 char display_line = 0;
 #define moreprintf(...)				\
@@ -105,7 +100,8 @@ int main(int argc, char *argv[])
     int return_code = 0;
     int nb_pci_devices = 0;
 
-    openconsole(&dev_stdcon_r, &dev_stdcon_w);
+    (void)argc;
+    (void)argv;
 
     /* Scanning to detect pci buses and devices */
     printf("PCI: Scanning PCI BUS\n");

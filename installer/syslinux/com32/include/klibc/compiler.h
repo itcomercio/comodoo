@@ -108,6 +108,16 @@
 # define __unusedfunc
 #endif
 
+/* Declare a variable or data structure as unused. */
+#ifdef __GNUC__
+# define __unused	__attribute__((unused))
+#else
+# define __unused
+#endif
+
+/* Used symbol */
+#define __used				__attribute__((used))
+
 /* Constructors and destructors */
 #define __constructor	__attribute__((constructor))
 #define __destructor	__attribute__((destructor))
@@ -125,5 +135,10 @@
 /* Handling of common (affect constructors/destructors) */
 #define __common	__attribute__((common))
 #define __nocommon	__attribute__((nocommon))
+
+/* Weak symbols */
+#define __weak			__attribute__((weak))
+
+#define __export		__attribute__((visibility("default")))
 
 #endif

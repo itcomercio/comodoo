@@ -28,17 +28,11 @@
 #include <minmax.h>
 #include <sys/stat.h>
 #include <console.h>
+#include <dprintf.h>
 
 #include <syslinux/loadfile.h>
 #include <syslinux/movebits.h>
 #include <syslinux/bootrm.h>
-
-#define DEBUG 0
-#if DEBUG
-# define dprintf printf
-#else
-# define dprintf(f, ...) ((void)0)
-#endif
 
 typedef uint8_t guid_t[16];
 
@@ -75,7 +69,6 @@ static int boot_sdi(void *ptr, size_t len)
     struct syslinux_memmap *mmap = NULL, *amap = NULL;
     struct syslinux_rm_regs regs;
     struct syslinux_movelist *ml = NULL;
-    char *boot_blob;
 
     /* **** Basic sanity checking **** */
     if (hdr->Signature != SDI_SIGNATURE) {
@@ -166,8 +159,6 @@ int main(int argc, char *argv[])
 {
     void *data;
     size_t data_len;
-
-    openconsole(&dev_null_r, &dev_stdcon_w);
 
     if (argc != 2) {
 	error("Usage: sdi.c32 sdi_file\n");

@@ -14,18 +14,23 @@
 # SYSLINUX utilities
 #
 
-topdir = ..
-include $(topdir)/MCONFIG
+VPATH = $(SRC)
+include $(MAKEDIR)/syslinux.mk
 
-CFLAGS   = $(GCCWARN) -Os -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
-LDFLAGS  = -O2 -s
+CFLAGS   = $(GCCWARN) -Os -fomit-frame-pointer -D_FILE_OFFSET_BITS=64 -I$(SRC)
+LDFLAGS  = -O2
 
-TARGETS	 = mkdiskimage isohybrid gethostip
-ASIS     = keytab-lilo lss16toppm md5pass ppmtolss16 sha1pass syslinux2ansi \
-	   pxelinux-options
+C_TARGETS	 = isohybrid gethostip memdiskfind
+SCRIPT_TARGETS	 = mkdiskimage
+SCRIPT_TARGETS	+= isohybrid.pl  # about to be obsoleted
+ASIS		 = $(addprefix $(SRC)/,keytab-lilo lss16toppm md5pass \
+		   ppmtolss16 sha1pass syslinux2ansi pxelinux-options)
 
-ISOHDPFX = ../mbr/isohdpfx.bin ../mbr/isohdpfx_f.bin ../mbr/isohdpfx_c.bin \
-	   ../mbr/isohdppx.bin ../mbr/isohdppx_f.bin ../mbr/isohdppx_c.bin
+TARGETS = $(C_TARGETS) $(SCRIPT_TARGETS)
+
+ISOHDPFX = $(addprefix $(OBJ)/,../mbr/isohdpfx.bin ../mbr/isohdpfx_f.bin \
+	   ../mbr/isohdpfx_c.bin \
+	   ../mbr/isohdppx.bin ../mbr/isohdppx_f.bin ../mbr/isohdppx_c.bin)
 
 all: $(TARGETS)
 
@@ -33,19 +38,29 @@ all: $(TARGETS)
 	$(CC) $(UMAKEDEPS) $(CFLAGS) -c -o $@ $<
 
 mkdiskimage: mkdiskimage.in ../mbr/mbr.bin bin2hex.pl
-	$(PERL) bin2hex.pl < ../mbr/mbr.bin | cat mkdiskimage.in - > $@
+	$(PERL) $(SRC)/bin2hex.pl < $(OBJ)/../mbr/mbr.bin | cat $(SRC)/mkdiskimage.in - > $@
 	chmod a+x $@
 
-isohybrid: isohybrid.in $(ISOHDPFX) bin2hex.pl
-	cp -f isohybrid.in $@
-	for f in $(ISOHDPFX) ; do $(PERL) bin2hex.pl < $$f >> $@ ; done
+# Works on anything with a Perl interpreter...
+isohybrid.pl: isohybrid.in $(ISOHDPFX) bin2hex.pl
+	cp -f $(SRC)/isohybrid.in $@
+	for f in $(ISOHDPFX) ; do $(PERL) $(SRC)/bin2hex.pl < $$f >> $@ ; done
 	chmod a+x $@
+
+isohdpfx.c: $(ISOHDPFX) isohdpfxarray.pl
+	$(PERL) $(SRC)/isohdpfxarray.pl $(ISOHDPFX) > $@
+
+isohybrid: isohybrid.o isohdpfx.o
+	$(CC) $(LDFLAGS) -o $@ $^ -luuid
 
 gethostip: gethostip.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
+memdiskfind: memdiskfind.o
+	$(CC) $(LDFLAGS) -o $@ $^
+
 tidy dist:
-	rm -f *.o .*.d
+	rm -f *.o .*.d isohdpfx.c
 
 clean: tidy
 	rm -f $(TARGETS)
@@ -57,5 +72,8 @@ installer: all
 install: installer
 	mkdir -m 755 -p $(INSTALLROOT)$(BINDIR)
 	install -m 755 $(TARGETS) $(ASIS) $(INSTALLROOT)$(BINDIR)
+
+strip:
+	$(STRIP) $(C_TARGETS)
 
 -include .*.d

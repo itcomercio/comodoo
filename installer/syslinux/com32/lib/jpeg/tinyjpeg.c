@@ -332,7 +332,6 @@ static void build_huffman_table(const unsigned char *bits, const unsigned char *
   unsigned int i, j, code, code_size, val, nbits;
   unsigned char huffsize[HUFFMAN_BITS_SIZE+1], *hz;
   unsigned int huffcode[HUFFMAN_BITS_SIZE+1], *hc;
-  int next_free_entry;
 
   /*
    * Build a temp array
@@ -371,7 +370,6 @@ static void build_huffman_table(const unsigned char *bits, const unsigned char *
   /*
    * Build the lookup table, and the slowtable if needed.
    */
-  next_free_entry = -1;
   for (i=0; huffsize[i]; i++)
    {
      val = vals[i];
@@ -442,8 +440,8 @@ static void build_default_huffman_tables(struct jdec_private *priv)
 
 static void print_SOF(const unsigned char *stream)
 {
+#if JPEG_DEBUG
   int width, height, nr_components, precision;
-#if DEBUG
   const char *nr_components_to_string[] = {
      "????",
      "Grayscale",
@@ -451,7 +449,6 @@ static void print_SOF(const unsigned char *stream)
      "YCbCr",
      "CYMK"
   };
-#endif
 
   precision = stream[2];
   height = be16_to_cpu(stream+3);
@@ -463,6 +460,8 @@ static void print_SOF(const unsigned char *stream)
       width, height,
       nr_components, nr_components_to_string[nr_components],
       precision);
+#endif
+  (void)stream;
 }
 
 /*******************************************************************************
@@ -665,7 +664,7 @@ static int parse_DRI(struct jdec_private *priv, const unsigned char *stream)
 
   priv->restart_interval = be16_to_cpu(stream+2);
 
-#if DEBUG
+#if JPEG_DEBUG
   trace("Restart interval = %d\n", priv->restart_interval);
 #endif
 

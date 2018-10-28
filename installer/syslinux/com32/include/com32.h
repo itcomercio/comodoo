@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 2002-2009 H. Peter Anvin - All Rights Reserved
- *   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+ *   Copyright 2009-2010 Intel Corporation; author: H. Peter Anvin
  *
  *   Permission is hereby granted, free of charge, to any person
  *   obtaining a copy of this software and associated documentation
@@ -92,15 +92,19 @@ typedef struct {
 #define EFLAGS_VIP		0x00100000
 #define EFLAGS_ID		0x00200000
 
+struct com32_pmapi;
+
 extern struct com32_sys_args {
     uint32_t cs_sysargs;
     char *cs_cmdline;
-    void __cdecl(*cs_intcall) (uint8_t, const com32sys_t *, com32sys_t *);
+    void __cdecl (*cs_intcall)(uint8_t, const com32sys_t *, com32sys_t *);
     void *cs_bounce;
     uint32_t cs_bounce_size;
-    void __cdecl(*cs_farcall) (uint32_t, const com32sys_t *, com32sys_t *);
-    int __cdecl(*cs_cfarcall) (uint32_t, const void *, uint32_t);
+    void __cdecl (*cs_farcall)(uint32_t, const com32sys_t *, com32sys_t *);
+    int __cdecl (*cs_cfarcall)(uint32_t, const void *, uint32_t);
     uint32_t cs_memsize;
+    const char *cs_name;
+    const struct com32_pmapi *cs_pm;
 } __com32;
 
 /*
@@ -114,6 +118,14 @@ int __cfarcall(uint16_t __cs, uint16_t __ip,
 extern const com32sys_t __com32_zero_regs;
 
 /*
+ * Lowmem allocation functions
+ */
+void *lmalloc(size_t);
+void *lzalloc(size_t);
+void lfree(void *);
+char *lstrdup(const char *);
+
+/*
  * These functions convert between linear pointers in the range
  * 0..0xFFFFF and real-mode style SEG:OFFS pointers.  Note that a
  * 32-bit linear pointer is not compatible with a SEG:OFFS pointer
@@ -123,10 +135,22 @@ extern const com32sys_t __com32_zero_regs;
  * specific segment.  OFFS_VALID() will return whether or not the
  * pointer is actually reachable from the target segment.
  */
+#if defined(CORE_DEBUG) && (defined(__COM32__) || defined(__SYSLINUX_CORE__))
+__noreturn __bad_SEG(const volatile void *);
+
+static inline uint16_t SEG(const volatile void *__p)
+{
+    if (__unlikely((uintptr_t)__p > 0xfffff))
+	__bad_SEG(__p);
+
+    return (uint16_t) (((uintptr_t) __p) >> 4);
+}
+#else
 static inline uint16_t SEG(const volatile void *__p)
 {
     return (uint16_t) (((uintptr_t) __p) >> 4);
 }
+#endif
 
 static inline uint16_t OFFS(const volatile void *__p)
 {
@@ -152,7 +176,7 @@ static inline bool _OFFS_VALID(const volatile void *__p, size_t __s,
 
 static inline void *MK_PTR(uint16_t __seg, uint16_t __offs)
 {
-    return (void *)((__seg << 4) + __offs);
+    return (void *)(unsigned long)((__seg << 4) + __offs);
 }
 
 /* Some tools to handle 16:16 far pointers in memory */
@@ -181,5 +205,7 @@ static inline far_ptr_t FAR_PTR(void *__ptr)
     __fptr.seg  = SEG(__ptr);
     return __fptr;
 }
+
+extern const char *com32_cmdline(void);
 
 #endif /* _COM32_H */

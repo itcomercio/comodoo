@@ -30,6 +30,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <console.h>
@@ -37,20 +38,7 @@
 #include <com32.h>
 #include <syslinux/boot.h>
 #include <syslinux/config.h>
-
-#ifdef DEBUG
-# define dprintf printf
-#else
-# define dprintf(...) ((void)0)
-#endif
-
-static char *skipspace(char *p)
-{
-    while (*p && *p <= ' ')
-	p++;
-
-    return p;
-}
+#include <dprintf.h>
 
 #define MAX_LINE 512
 
@@ -192,7 +180,6 @@ int main(int argc, char *argv[])
     struct match *list, *match;
     struct pci_domain *pci_domain;
 
-    openconsole(&dev_null_r, &dev_stdcon_w);
     pci_domain = pci_scan();
 
     if (pci_domain) {

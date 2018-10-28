@@ -11,8 +11,9 @@ ENTRY(_start)
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  . = 0x101000;
-  PROVIDE (__executable_start = .);
+  . = 0;
+  HIDDEN (__executable_start = .);
+  HIDDEN (_stext = .);
 
   .init           :
   {
@@ -28,40 +29,39 @@ SECTIONS
   {
     KEEP (*(.fini))
   } =0x90909090
-  PROVIDE (__etext = .);
-  PROVIDE (_etext = .);
-  PROVIDE (etext = .);
+  HIDDEN (_etext = .);
+
+  HIDDEN( __rodata_start = .);
   .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
   .rodata1        : { *(.rodata1) }
+  HIDDEN(__rodata_end = .);
 
-  /* Ensure the __preinit_array_start label is properly aligned.  We
-     could instead move the label definition inside the section, but
-     the linker would then create the section even if it turns out to
-     be empty, which isn't pretty.  */
+  /*
+   * The difference betwee .ctors/.dtors and .init_array/.fini_array
+   * is the ordering, but we don't use prioritization for libcom32, so
+   * just lump them all together and hope that's okay.
+   */
   . = ALIGN(4);
-  PROVIDE (__preinit_array_start = .);
-  .preinit_array     : { *(.preinit_array) }
-  PROVIDE (__preinit_array_end = .);
-  PROVIDE (__init_array_start = .);
-  .init_array     : { *(.init_array) }
-  PROVIDE (__init_array_end = .);
-  PROVIDE (__fini_array_start = .);
-  .fini_array     : { *(.fini_array) }
-  PROVIDE (__fini_array_end = .);
-  PROVIDE (__ctors_start = .);
-  .ctors          :
-  {
-    KEEP (*(SORT(.ctors.*)))
-    KEEP (*(.ctors))
+  .ctors          : {
+    HIDDEN(__ctors_start = .);
+    KEEP (*(SORT(.preinit_array*)))
+    KEEP (*(SORT(.init_array*)))
+    KEEP (*(SORT(.ctors*)))
+    HIDDEN(__ctors_end = .);
   }
-  PROVIDE (__ctors_end = .);
-  PROVIDE (__dtors_start = .);
-  .dtors          :
-  {
-    KEEP (*(SORT(.dtors.*)))
-    KEEP (*(.dtors))
+  .dtors          : {
+    HIDDEN(__dtors_start = .);
+    KEEP (*(SORT(.fini_array*)))
+    KEEP (*(SORT(.dtors*)))
+    HIDDEN(__dtors_end = .);
   }
-  PROVIDE (__dtors_end = .);
+
+  .got            : {
+    HIDDEN(__got_start = .);
+    KEEP (*(.got.plt))
+    KEEP (*(.got))
+    HIDDEN(__got_end = .);
+  }
 
   /* Adjust the address for the data segment.  Avoid mixing code and
      data within same 128-byte chunk. */
@@ -69,13 +69,15 @@ SECTIONS
 
   .data           :
   {
-    *(.data .data.* .gnu.linkonce.d.*)
+    HIDDEN(_sdata = .);
+    KEEP(*(.data .data.* .gnu.linkonce.d.*))
     SORT(CONSTRUCTORS)
+    *(.data1)
+    . = ALIGN(4);
+    HIDDEN(_edata = .);
   }
-  .data1          : { *(.data1) }
-  _edata = .;
-  PROVIDE (edata = .);
-  __bss_start = .;
+
+  HIDDEN(__bss_start = .);
   .bss            :
   {
    *(.dynbss)
@@ -84,11 +86,10 @@ SECTIONS
    /* Align here to ensure that the .bss section occupies space up to
       _end.  Align after .bss to ensure correct alignment even if the
       .bss section disappears because there are no input sections.  */
-   . = ALIGN(32 / 8);
+   . = ALIGN(4);
   }
-  . = ALIGN(32 / 8);
-  _end = .;
-  PROVIDE (end = .);
+  . = ALIGN(4);
+  HIDDEN(_end = .);
 
   /* Stabs debugging sections.  */
   .stab          0 : { *(.stab) }

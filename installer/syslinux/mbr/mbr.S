@@ -49,8 +49,8 @@ bootsec:
 	.text
 	.globl	_start
 _start:
+	.byte	0x33, 0xc0	/* xorw	%ax, %ax */
 	cli
-	xorw	%ax, %ax
 	movw	%ax, %ds
 	movw	%ax, %ss
 	movw	$stack, %sp
@@ -265,6 +265,19 @@ boot:
 	movl	%eax, 8(%si)	/* Adjust in-memory partition table entry */
 	call	read_sector
 	jc	disk_error
+
+	/* Check if the read sector is a XFS superblock */
+	cmpl	$0x42534658, (bootsec) /* "XFSB" */
+	jne	no_xfs
+
+	/* We put the Syslinux boot sector at offset 0x800 (4 sectors), so we
+	 * need to adjust %eax (%eax + 4) to read the right sector into 0x7C00.
+	 */
+	addl	$0x800 >> 0x09, %eax /* plus 4 sectors */
+	call	read_sector
+	jc	disk_error
+
+no_xfs:
 	cmpw	$0xaa55, (bootsec+510)
 	jne	missing_os		/* Not a valid boot sector */
 	movw	$driveno, %sp	/* driveno == bootsec-6 */

@@ -11,11 +11,17 @@ struct tms {
     /* Empty */
 };
 
-#define HZ		18	/* Piddly resolution... */
+#define HZ		1000
 #define CLK_TCK		HZ
 
-typedef uint16_t clock_t;
+typedef uint32_t clock_t;
 
-clock_t times(struct tms *);
+extern volatile uint32_t __ms_timer;
+
+static inline clock_t times(struct tms *buf)
+{
+    (void)buf;
+    return __ms_timer;
+}
 
 #endif /* _SYS_TIMES_H */

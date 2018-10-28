@@ -47,7 +47,7 @@ static void show_memory_e820(int argc __unused, char **argv __unused,
     more_printf("BIOS-provided physical RAM e820 map:\n");
     for (int i = 0; i < count; i++) {
 	get_type(map[i].type, type, 14);
-	more_printf("%016llx - %016llx %016llx (%s)\n",
+	more_printf("%016" PRIx64 "x - %016" PRIx64 "x %016" PRIx64 "x (%s)\n",
 		    map[i].addr, map[i].size, map[i].addr + map[i].size,
 		    remove_spaces(type));
     }
@@ -60,7 +60,7 @@ static void show_memory_e820(int argc __unused, char **argv __unused,
     more_printf("Sanitized e820 map:\n");
     for (int i = 0; i < nr; i++) {
 	get_type(nm[i].type, type, 14);
-	more_printf("%016llx - %016llx %016llx (%s)\n",
+	more_printf("%016" PRIx64 "x - %016" PRIx64 "x %016" PRIx64 "x (%s)\n",
 		    nm[i].addr, nm[i].size, nm[i].addr + nm[i].size,
 		    remove_spaces(type));
     }
@@ -101,22 +101,27 @@ struct cli_callback_descr list_memory_show_modules[] = {
     {
      .name = "e820",
      .exec = show_memory_e820,
+     .nomodule=false,
      },
     {
      .name = "e801",
      .exec = show_memory_e801,
+     .nomodule=false,
      },
     {
      .name = "88",
      .exec = show_memory_88,
+     .nomodule=false,
      },
     {
      .name = CLI_DMI_MEMORY_BANK,
      .exec = show_dmi_memory_bank,
+     .nomodule=false,
      },
     {
      .name = NULL,
      .exec = NULL,
+     .nomodule=false,
      },
 };
 

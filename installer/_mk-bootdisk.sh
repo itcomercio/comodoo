@@ -547,6 +547,7 @@ extract_to_keepfile python2-dbus >> $KEEPFILE
 extract_to_keepfile python2-pyparted >> $KEEPFILE
 extract_to_keepfile dialog >> $KEEPFILE
 extract_to_keepfile ncurses-base >> $KEEPFILE
+extract_to_keepfile ncurses-libs >> $KEEPFILE
 extract_to_keepfile vim-minimal >> $KEEPFILE
 extract_to_keepfile udisks2 >> $KEEPFILE
 
@@ -850,8 +851,11 @@ echo_note "OK" "[OK]"
 echo_note "WARNING" "[002] syslinux installation ...."
 cd ${CUR_PWD}
 cp -a addons/isolinux ${MKB_SYSLINUX}
-cp syslinux/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
-cp syslinux/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
+cp syslinux/bios/core/isolinux.bin ${MKB_SYSLINUX}/isolinux
+cp syslinux/bios/com32/menu/vesamenu.c32 ${MKB_SYSLINUX}/isolinux
+cp syslinux/bios/com32/elflink/ldlinux/ldlinux.c32 ${MKB_SYSLINUX}/isolinux
+cp syslinux/bios/com32/lib/libcom32.c32 ${MKB_SYSLINUX}/isolinux
+cp syslinux/bios/com32/libutil/libutil.c32 ${MKB_SYSLINUX}/isolinux
 echo_note "OK" "[OK]"
 
 #

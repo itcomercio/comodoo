@@ -15,20 +15,19 @@
 ## Multiboot module
 ##
 
-topdir = ../..
-include ../MCONFIG
+VPATH = $(SRC)
+include $(MAKEDIR)/elf.mk
 
-LIBS	   = ../libutil/libutil_com.a ../lib/libcom32.a $(LIBGCC)
-LNXLIBS	   = ../libutil/libutil_lnx.a
+LNXLIBS	   = $(objdir)/com32/libutil/libutil_lnx.a
 
 MODULES	  = mboot.c32
 TESTFILES =
 
-OBJS = mboot.o map.o mem.o initvesa.o apm.o solaris.o
+OBJS = mboot.o map.o mem.o initvesa.o apm.o solaris.o syslinux.o
 
 all: $(MODULES) $(TESTFILES)
 
-mboot.elf : $(OBJS) $(LIBS) $(C_LIBS)
+mboot.elf : $(OBJS) $(C_LIBS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
 tidy dist:

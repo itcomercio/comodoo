@@ -6,7 +6,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include "sysdump.h"
-#include "backend.h"
 
 struct dmi_header {
     char signature[5];
@@ -60,13 +59,13 @@ static bool is_smbios(size_t dptr)
 	is_old_dmi(dptr+16);
 }
 
-static void dump_smbios(struct backend *be, size_t dptr)
+static void dump_smbios(struct upload_backend *be, size_t dptr)
 {
     const struct smbios_header *smb = (void *)dptr;
     struct smbios_header smx = *smb;
     char filename[32];
 
-    snprintf(filename, sizeof filename, "dmi/%05x.%08x",
+    snprintf(filename, sizeof filename, "dmi/%05zx.%08x",
 	     dptr, smb->dmi.tbladdr);
     cpio_hdr(be, MODE_FILE, smb->dmi.tbllen + 32, filename);
 
@@ -82,7 +81,7 @@ static void dump_smbios(struct backend *be, size_t dptr)
     write_data(be, (const void *)smb->dmi.tbladdr, smb->dmi.tbllen);
 }
 
-static void dump_old_dmi(struct backend *be, size_t dptr)
+static void dump_old_dmi(struct upload_backend *be, size_t dptr)
 {
     const struct dmi_header *dmi = (void *)dptr;
     struct fake {
@@ -91,7 +90,7 @@ static void dump_old_dmi(struct backend *be, size_t dptr)
     } fake;
     char filename[32];
 
-    snprintf(filename, sizeof filename, "dmi/%05x.%08x",
+    snprintf(filename, sizeof filename, "dmi/%05zx.%08x",
 	     dptr, dmi->tbladdr);
     cpio_hdr(be, MODE_FILE, dmi->tbllen + 32, filename);
 
@@ -108,7 +107,7 @@ static void dump_old_dmi(struct backend *be, size_t dptr)
     write_data(be, (const void *)dmi->tbladdr, dmi->tbllen);
 }
 
-void dump_dmi(struct backend *be)
+void dump_dmi(struct upload_backend *be)
 {
     size_t dptr;
 

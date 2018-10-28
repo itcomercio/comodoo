@@ -12,6 +12,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdio.h>
+#include <sys/bitops.h>
 
 #ifndef LONG_BIT
 #define LONG_BIT (CHAR_BIT*sizeof(long))
@@ -19,9 +20,8 @@
 
 enum flags {
     FL_SPLAT = 0x01,		/* Drop the value, do not assign */
-    FL_INV = 0x02,		/* Character-set with inverse */
-    FL_WIDTH = 0x04,		/* Field width specified */
-    FL_MINUS = 0x08,		/* Negative number */
+    FL_WIDTH = 0x02,		/* Field width specified */
+    FL_MINUS = 0x04,		/* Negative number */
 };
 
 enum ranks {
@@ -46,25 +46,6 @@ enum bail {
     bail_err			/* Conversion mismatch */
 };
 
-static inline const char *skipspace(const char *p)
-{
-    while (isspace((unsigned char)*p))
-	p++;
-    return p;
-}
-
-#undef set_bit
-static inline void set_bit(unsigned long *bitmap, unsigned int bit)
-{
-    bitmap[bit / LONG_BIT] |= 1UL << (bit % LONG_BIT);
-}
-
-#undef test_bit
-static inline int test_bit(unsigned long *bitmap, unsigned int bit)
-{
-    return (int)(bitmap[bit / LONG_BIT] >> (bit % LONG_BIT)) & 1;
-}
-
 int vsscanf(const char *buffer, const char *format, va_list ap)
 {
     const char *p = format;
@@ -87,7 +68,6 @@ int vsscanf(const char *buffer, const char *format, va_list ap)
     } state = st_normal;
     char *sarg = NULL;		/* %s %c or %[ string argument */
     enum bail bail = bail_none;
-    int sign;
     int converted = 0;		/* Successful conversions */
     unsigned long matchmap[((1 << CHAR_BIT) + (LONG_BIT - 1)) / LONG_BIT];
     int matchinv = 0;		/* Is match map inverted? */
@@ -194,33 +174,27 @@ int vsscanf(const char *buffer, const char *format, va_list ap)
 #endif
 		    rank = rank_ptr;
 		    base = 0;
-		    sign = 0;
 		    goto scan_int;
 
 		case 'i':	/* Base-independent integer */
 		    base = 0;
-		    sign = 1;
 		    goto scan_int;
 
 		case 'd':	/* Decimal integer */
 		    base = 10;
-		    sign = 1;
 		    goto scan_int;
 
 		case 'o':	/* Octal integer */
 		    base = 8;
-		    sign = 0;
 		    goto scan_int;
 
 		case 'u':	/* Unsigned decimal integer */
 		    base = 10;
-		    sign = 0;
 		    goto scan_int;
 
 		case 'x':	/* Hexadecimal integer */
 		case 'X':
 		    base = 16;
-		    sign = 0;
 		    goto scan_int;
 
 		case 'n':	/* Number of characters consumed */
@@ -320,10 +294,11 @@ set_integer:
 	    break;
 
 	case st_match_init:	/* Initial state for %[ match */
-	    if (ch == '^' && !(flags & FL_INV)) {
+	    if (ch == '^' && !matchinv) {
 		matchinv = 1;
 	    } else {
-		set_bit(matchmap, (unsigned char)ch);
+		range_start = (unsigned char)ch;
+		set_bit((unsigned char)ch, matchmap);
 		state = st_match;
 	    }
 	    break;
@@ -332,21 +307,21 @@ set_integer:
 	    if (ch == ']') {
 		goto match_run;
 	    } else if (ch == '-') {
-		range_start = (unsigned char)ch;
 		state = st_match_range;
 	    } else {
-		set_bit(matchmap, (unsigned char)ch);
+		range_start = (unsigned char)ch;
+		set_bit((unsigned char)ch, matchmap);
 	    }
 	    break;
 
 	case st_match_range:	/* %[ match after - */
 	    if (ch == ']') {
-		set_bit(matchmap, (unsigned char)'-');	/* - was last character */
+		set_bit((unsigned char)'-', matchmap);	/* - was last character */
 		goto match_run;
 	    } else {
 		int i;
-		for (i = range_start; i < (unsigned char)ch; i++)
-		    set_bit(matchmap, i);
+		for (i = range_start; i <= (unsigned char)ch; i++)
+		    set_bit(i, matchmap);
 		state = st_match;
 	    }
 	    break;
@@ -354,7 +329,7 @@ set_integer:
 match_run:			/* Match expression finished */
 	    qq = q;
 	    while (width && *q
-		   && test_bit(matchmap, (unsigned char)*q) ^ matchinv) {
+		   && test_bit((unsigned char)*q, matchmap) ^ matchinv) {
 		*sarg++ = *q++;
 	    }
 	    if (q != qq) {

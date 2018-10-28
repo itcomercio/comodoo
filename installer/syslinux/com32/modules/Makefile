@@ -15,32 +15,35 @@
 ## COM32 standard modules
 ##
 
-topdir = ../..
-include ../MCONFIG
+VPATH = $(SRC)
+include $(MAKEDIR)/elf.mk
 
-MODULES	  = chain.c32 config.c32 ethersel.c32 dmitest.c32 cpuidtest.c32 \
-	    disk.c32 pcitest.c32 elf.c32 linux.c32 reboot.c32 pmload.c32 \
-	    meminfo.c32 sdi.c32 sanboot.c32 ifcpu64.c32 vesainfo.c32 \
-	    kbdmap.c32 cmd.c32 vpdtest.c32 gpxecmd.c32 ifcpu.c32
+# BIOS-specific modules
+MOD_BIOS = disk.c32 elf.c32 ethersel.c32 gpxecmd.c32 ifmemdsk.c32 ifplop.c32 \
+	   kbdmap.c32 kontron_wdt.c32 pcitest.c32 pmload.c32 poweroff.c32 \
+	   prdhcp.c32 pxechn.c32 sanboot.c32 sdi.c32 vesainfo.c32
+
+# All-architecture modules
+MOD_ALL  = cat.c32 cmd.c32 config.c32 cptime.c32 cpuid.c32 cpuidtest.c32 \
+	   debug.c32 dir.c32 dmitest.c32 hexdump.c32 host.c32 ifcpu.c32 \
+	   ifcpu64.c32 linux.c32 ls.c32 meminfo.c32 pwd.c32 reboot.c32 \
+	   vpdtest.c32 whichsys.c32 zzjson.c32
+
+ifeq ($(FIRMWARE),BIOS)
+MODULES = $(MOD_ALL) $(MOD_BIOS)
+else
+MODULES = $(MOD_ALL)
+endif
 
 TESTFILES =
 
 all: $(MODULES) $(TESTFILES)
 
-pcitest.elf : pcitest.o $(LIBS) $(C_LIBS)
-	$(LD) $(LDFLAGS) -o $@ $^
-
-cpuidtest.elf : cpuidtest.o $(GPLLIB) $(LIBS) $(C_LIBS)
-	$(LD) $(LDFLAGS) -o $@ $^
-
 .PRECIOUS: %.o
 dmitest.o: dmitest.c
 	$(CC) $(CFLAGS) $(GPLINCLUDE) -c -o $@ $<
 
-dmitest.elf :  dmi_utils.o dmitest.o $(GPLLIB) $(LIBS) $(C_LIBS)
-	$(LD) $(LDFLAGS) -o $@ $^
-
-ethersel.elf : ethersel.o $(LIBS) $(C_LIBS)
+dmitest.elf : dmi_utils.o dmitest.o $(C_LIBS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
 tidy dist:

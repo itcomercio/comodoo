@@ -42,40 +42,48 @@
    or -1 on invocation failure */
 int pxe_get_cached_info(int level, void **buf, size_t * len)
 {
-    com32sys_t regs;
-    t_PXENV_GET_CACHED_INFO *gci = __com32.cs_bounce;
+    const int max_dhcp_packet = 2048;
+    t_PXENV_GET_CACHED_INFO *gci;
     void *bbuf, *nbuf;
+    int err;
 
-    memset(&regs, 0, sizeof regs);
-    regs.eax.w[0] = 0x0009;
-    regs.ebx.w[0] = PXENV_GET_CACHED_INFO;
-    regs.es = SEG(gci);
-    regs.edi.w[0] = OFFS(gci);
+    gci = lmalloc(sizeof *gci + max_dhcp_packet);
+    if (!gci)
+	return -1;
 
     bbuf = &gci[1];
 
     gci->Status = PXENV_STATUS_FAILURE;
     gci->PacketType = level;
-    gci->BufferSize = gci->BufferLimit = 65536 - sizeof(*gci);
+    gci->BufferSize = gci->BufferLimit = max_dhcp_packet;
     gci->Buffer.seg = SEG(bbuf);
     gci->Buffer.offs = OFFS(bbuf);
 
-    __intcall(0x22, &regs, &regs);
+    err = pxe_call(PXENV_GET_CACHED_INFO, gci);
 
-    if (regs.eflags.l & EFLAGS_CF)
-	return -1;
+    if (err) {
+	err = -1;
+	goto exit;
+    }
 
-    if (gci->Status)
-	return gci->Status;
+    if (gci->Status) {
+	err = gci->Status;
+	goto exit;
+    }
 
-    nbuf = malloc(gci->BufferSize);	/* malloc() does not use the bounce buffer */
-    if (!nbuf)
-	return -1;
+    nbuf = malloc(gci->BufferSize);
+    if (!nbuf) {
+	err = -1;
+	goto exit;
+    }
 
     memcpy(nbuf, bbuf, gci->BufferSize);
 
     *buf = nbuf;
     *len = gci->BufferSize;
+    err = 0;
 
-    return 0;
+exit:
+    lfree(gci);
+    return err;
 }

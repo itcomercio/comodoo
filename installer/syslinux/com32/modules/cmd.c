@@ -17,9 +17,10 @@
  */
 
 #include <com32.h>
+#include <syslinux/boot.h>
 
 int main(void)
 {
-    syslinux_run_command(__com32.cs_cmdline);
+    syslinux_run_command(com32_cmdline());
     return -1;
 }

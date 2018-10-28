@@ -100,6 +100,11 @@ __extern int vsnprintf(char *, size_t n, const char *, va_list);
 __extern int asprintf(char **, const char *, ...);
 __extern int vasprintf(char **, const char *, va_list);
 
+#define mp(f, x...) \
+        printf("[%s()]: " f "\n", __func__,##x)
+#define mpi()	mp("enter")
+#define mpo()	mp("exit")
+
 /* No buffering, so no flushing needed */
 static __inline__ int fflush(FILE * __f)
 {
@@ -113,5 +118,28 @@ __extern int vsscanf(const char *, const char *, va_list);
 __extern void perror(const char *);
 
 __extern int rename(const char *, const char *);
+
+/*
+ * unhexchar: Convert a hexadecimal digit to the equivalent number
+ *
+ * Returns 0 if 'data' was converted succesfully, -1 otherwise.
+ */
+static inline int unhexchar(unsigned char *data)
+{
+	unsigned char num = *data;
+
+	if (num >= '0' && num <= '9') {
+		*data = num - '0';
+		return 0;
+	} else {
+		num |= 0x20;	/* upper case -> lower case */
+		if (num >= 'a' && num <= 'f') {
+			*data = num - 'a' + 10;
+			return 0;
+		}
+	}
+
+	return -1;
+}
 
 #endif /* _STDIO_H */

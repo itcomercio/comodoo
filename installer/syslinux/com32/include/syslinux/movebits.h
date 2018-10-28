@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef uint32_t addr_t;
 
@@ -34,6 +35,7 @@ enum syslinux_memmap_types {
     SMT_RESERVED,		/* Unusable memory */
     SMT_ALLOC,			/* Memory allocated by user */
     SMT_ZERO,			/* Memory that should be zeroed */
+    SMT_TERMINAL,		/* Memory to be used as a last resort */
 };
 
 struct syslinux_memmap {
@@ -41,6 +43,11 @@ struct syslinux_memmap {
     enum syslinux_memmap_types type;
     struct syslinux_memmap *next;
 };
+
+static inline bool valid_terminal_type(enum syslinux_memmap_types type)
+{
+    return (type == SMT_FREE) || (type == SMT_TERMINAL);
+}
 
 /*
  * moves is computed from "fraglist" and "memmap".  Areas that are
@@ -76,14 +83,28 @@ enum syslinux_memmap_types syslinux_memmap_type(struct syslinux_memmap *list,
 int syslinux_memmap_largest(struct syslinux_memmap *list,
 			    enum syslinux_memmap_types type,
 			    addr_t * start, addr_t * len);
+int syslinux_memmap_highest(const struct syslinux_memmap *list,
+			    enum syslinux_memmap_types types,
+			    addr_t *start, addr_t len,
+			    addr_t ceiling, addr_t align);
 void syslinux_free_memmap(struct syslinux_memmap *list);
 struct syslinux_memmap *syslinux_dup_memmap(struct syslinux_memmap *list);
-int syslinux_memmap_find(struct syslinux_memmap *list,
-			 enum syslinux_memmap_types type,
-			 addr_t * start, addr_t * len, addr_t align);
+int syslinux_memmap_find_type(struct syslinux_memmap *list,
+			      enum syslinux_memmap_types type,
+			      addr_t * start, addr_t * len, addr_t align);
+int syslinux_memmap_find(struct syslinux_memmap *mmap,
+			 addr_t *base, size_t size,
+			 bool relocate, size_t align,
+			 addr_t start_min, addr_t start_max,
+			 addr_t end_min, addr_t end_max);
 
 /* Debugging functions */
-void syslinux_dump_movelist(FILE * file, struct syslinux_movelist *ml);
-void syslinux_dump_memmap(FILE * file, struct syslinux_memmap *memmap);
+#ifdef DEBUG
+void syslinux_dump_movelist(struct syslinux_movelist *ml);
+void syslinux_dump_memmap(struct syslinux_memmap *memmap);
+#else
+#define syslinux_dump_movelist(x) ((void)0)
+#define syslinux_dump_memmap(x)	  ((void)0)
+#endif
 
 #endif /* _SYSLINUX_MOVEBITS_H */
