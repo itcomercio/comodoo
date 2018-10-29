@@ -550,13 +550,21 @@ extract_to_keepfile ncurses-base >> $KEEPFILE
 extract_to_keepfile ncurses-libs >> $KEEPFILE
 extract_to_keepfile vim-minimal >> $KEEPFILE
 extract_to_keepfile udisks2 >> $KEEPFILE
+extract_to_keepfile grub2-pc >> $KEEPFILE
+extract_to_keepfile grub2-common >> $KEEPFILE
+extract_to_keepfile grub2-pc-modules >> $KEEPFILE
+extract_to_keepfile grub2-tools >> $KEEPFILE
+extract_to_keepfile grub2-tools-minimal >> $KEEPFILE
+extract_to_keepfile grub2-extra >> $KEEPFILE
+extract_to_keepfile libkcapi >> $KEEPFILE
+extract_to_keepfile libkcapi-hmaccalc >> $KEEPFILE
+extract_to_keepfile os-prober >> $KEEPFILE
 
 rm -fr ${TOP_DIR}/tmp/dir
 PKGDEST=${TOP_DIR}/tmp/dir
 mkdir $PKGDEST
 echo_note "WARNING" "populate $PKGDEST ..."
 
-# TODO: nash missing
 # core linux utils population
 INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
@@ -564,8 +572,6 @@ kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
 ps gdb netstat test less ss coreutils"
 
-# TODO: nash missing
-# TODO: grub missing
 INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk \
 insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
 modprobe parted partprobe pidof reboot sfdisk shutdown ip \
@@ -650,13 +656,14 @@ cp -a usr/ $PKGDEST
 popd
 
 # grub
+for i in /usr/lib/grub/i386-pc/* ; do
+    install -m 644 $i ${PKGDEST}/usr/lib/grub/i386-pc/${i##*/}
+done
+
 echo_note "WARNING" "setting up GRUB loader staff ..."
 mkdir -p $PKGDEST/usr/share/grub/
 
-set_value_distro "/usr/lib/grub/x86_64-pc" "/usr/share/grub/i386-redhat"
-
-cp ${value}/stage{1,2} $PKGDEST/usr/share/grub/
-cat <<EOF > $PKGDEST/usr/bin/grub-install 
+cat <<EOF > $PKGDEST/usr/bin/grub-install
 #!/bin/bash
 /sbin/grub --batch <<! 1>/dev/null 2>/dev/null
 root (hd0,0)
@@ -827,6 +834,7 @@ mkdir -p ${MKB_DIR}/var/lib/dhclient
 mkdir -p ${MKB_DIR}/var/run
 mkdir -p ${MKB_DIR}/var/lib/misc
 mkdir -p ${MKB_DIR}/usr/share/grub/
+mkdir -p ${MKB_DIR}/usr/lib/grub/i386-pc
 mkdir -p ${MKB_DIR}/etc/dbus-1/system.d
 mkdir -p ${MKB_DIR}/usr/share/dbus-1/system-services
 mkdir -p ${MKB_DIR}/lib/dbus-1
@@ -935,6 +943,10 @@ instbin ${PWD}/stage-1 loader \
     ${MKB_DIR} /sbin/loader &>> ${LOGS_DIR}/init-loader.log
 echo_note "OK" "[OK]"
 
+# For checking python-dialog problems:
+# cp ${PWD}/test/exec-dialog ${MKB_DIR}/bin/exec-dialog
+# cp ${PWD}/test/check.py ${MKB_DIR}/bin/check.py
+
 #
 # hatl, reboot and poweroff set to custom "init"
 #
@@ -953,15 +965,12 @@ cp ${TOP_DIR}/pyblock/dmraidmodule.so.0.48 \
     ${TOP_DIR}/stage-2/usr/lib/anaconda/block/dmraidmodule.so
 
 # core linux utils population
-# TODO: nash missing
 INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
 ps gdb netstat test less id systemctl chvt tty"
 
-# TODO: nash missing
-# TODO: grub missing
 INSTALL_SBIN="blockdev chroot dmsetup eject fdisk \
 insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
 modprobe parted partprobe pidof reboot sfdisk shutdown ip \
@@ -1032,6 +1041,7 @@ done
 # udev
 install -m 644 /etc/udev/udev.conf $MKB_DIR/etc/udev/udev.conf
 install -m 644 /etc/udev/udev.conf $MKB_DIR/etc/udev/udev.conf
+
 
 for i in /lib/udev/rules.d/*.rules ; do
     install -m 644 $i $MKB_DIR/lib/udev/rules.d/${i##*/}
@@ -1169,8 +1179,14 @@ echo_note "OK" "[OK]"
 
 echo_note "WARNING" "[012] sfdisk.in file configuration"
 # Partitioning
+
+#sfdisk -f -uS -D /dev/sdb << EOF
+#2048,,83,*
+#
+#EOF
+
 cat > $MKB_DIR/etc/sfdisk.in <<!
-,100,S
+2028,100,S
 ;
 !
 echo_note "OK" "[OK]"

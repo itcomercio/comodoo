@@ -393,7 +393,7 @@ class BspImage:
         for filename in self.list_of_names:
             try:
                 f = self.tar.extract(filename, self.outputdir)
-                self.screen.gauge_update(50)
+                window.gauge_update(50)
             except KeyError:
                 print 'ERROR: Did not find %s in tar archive' % filename
 

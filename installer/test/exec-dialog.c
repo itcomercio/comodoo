@@ -16,9 +16,13 @@ int main(int argc, char **argv)
 {
   int in, out, pid, status;
 
+  /*
   char *dialog_args[] = {"python",
       "-c", 
       "from dialog import Dialog; d = Dialog(dialog='dialog');d.msgbox('HOLA')"};
+  */
+
+  char *dialog_args[] = {"python", "/bin/check.py"};
 
   // open input and output files
   //in = open("/dev/tty", O_RDONLY);
