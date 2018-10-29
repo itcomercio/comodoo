@@ -1,0 +1,100 @@
+GAS LISTING /tmp/cciPdiAL.s 			page 1
+
+
+   1              	# 1 "/opt/syslinux/dos/int2526.S"
+   1              	/* ----------------------------------------------------------------------- *
+   1              	...
+   0              	
+   0              	
+   1              	/* Must be included first of all */
+   2              	#ifdef __ASSEMBLY__
+   3              		.code16
+   4              	#else
+   2              	 *
+   3              	 *   Copyright 1998-2008 H. Peter Anvin - All Rights Reserved
+   4              	 *   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+   5              	 *
+   6              	 *   This program is free software; you can redistribute it and/or modify
+   7              	 *   it under the terms of the GNU General Public License as published by
+   8              	 *   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+   9              	 *   Boston MA 02111-1307, USA; either version 2 of the License, or
+  10              	 *   (at your option) any later version; incorporated herein by reference.
+  11              	 *
+  12              	 * ----------------------------------------------------------------------- */
+  13              	
+  14              	/*
+  15              	 * int 0x25 and 0x26 direct sector access
+  16              	 *
+  17              	 * Use assembly wrapper functions for these system calls, since unlike
+  18              	 * int 0x21 calls they are "dirty" and can destroy unrelated registers.
+  19              	 *
+  20              	 * NOTE: these all assume the data buffer is in the data segment, i.e.
+  21              	 * %ds == %es == dio.bufseg.
+  22              	 *
+  23              	 * Usage: int int25_read_sector(drive, dio)
+  24              	 * Usage: int int26_write_sector(drive, dio)
+  25              	 */
+  26              	
+  27              		.code16gcc
+  28              		.text
+  29              	
+  30              		.globl	int25_read_sector
+  31              		.type	int25_read_sector, @function
+  32              	int25_read_sector:
+  33 0000 6655     		pushl	%ebp
+  34 0002 6657     		pushl	%edi
+  35 0004 6656     		pushl	%esi
+  36 0006 6653     		pushl	%ebx
+  37              	
+  38 0008 48       		decw	%ax		/* AL = drive number (0 = A:) */
+  39 0009 89D3     		movw	%dx, %bx	/* BX = dio structure */
+  40 000b 8B5706   		movw	6(%bx), %dx	/* DX = data buffer */
+  41 000e B9FFFF   		movw	$-1, %cx
+  42 0011 CD25     		int	$0x25
+  43 0013 7202     		jc	1f
+  44 0015 31C0     		xorw	%ax, %ax	/* Error code: 0 = no error */
+  45              	1:
+  46 0017 9D       		popfw
+  47 0018 660FB7C0 		movzwl	%ax, %eax
+  48 001c 665B     		popl	%ebx
+  49 001e 665E     		popl	%esi
+GAS LISTING /tmp/cciPdiAL.s 			page 2
+
+
+  50 0020 665F     		popl	%edi
+  51 0022 665D     		popl	%ebp
+  52 0024 66C3     		retl
+  53              		.size	int25_read_sector, .-int25_read_sector
+  54              	
+  55              		.globl	int26_write_sector
+  56              		.type	int26_write_sector, @function
+  57              	int26_write_sector:
+  58 0026 6655     		pushl	%ebp
+  59 0028 6657     		pushl	%edi
+  60 002a 6656     		pushl	%esi
+  61 002c 6653     		pushl	%ebx
+  62              	
+  63 002e 48       		decw	%ax		/* AL = drive number (0 = A:) */
+  64 002f 89D3     		movw	%dx, %bx	/* BX = dio structure */
+  65 0031 8B5706   		movw	6(%bx), %dx	/* DX = data buffer */
+  66 0034 B9FFFF   		movw	$-1, %cx
+  67 0037 CD26     		int	$0x26
+  68 0039 7202     		jc	1f
+  69 003b 31C0     		xorw	%ax, %ax	/* Error code: 0 = no error */
+  70              	1:
+  71 003d 9D       		popfw
+  72 003e 660FB7C0 		movzwl	%ax, %eax
+  73 0042 665B     		popl	%ebx
+  74 0044 665E     		popl	%esi
+  75 0046 665F     		popl	%edi
+  76 0048 665D     		popl	%ebp
+  77 004a 66C3     		retl
+  78              		.size	int26_write_sector, .-int26_write_sector
+GAS LISTING /tmp/cciPdiAL.s 			page 3
+
+
+DEFINED SYMBOLS
+/opt/syslinux/dos/int2526.S:32     .text:0000000000000000 int25_read_sector
+/opt/syslinux/dos/int2526.S:57     .text:0000000000000026 int26_write_sector
+
+NO UNDEFINED SYMBOLS

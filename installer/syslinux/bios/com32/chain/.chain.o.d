@@ -1,0 +1,35 @@
+chain.o: /opt/syslinux/com32/chain/chain.c \
+ /opt/syslinux/com32/include/com32.h /opt/syslinux/com32/include/stdint.h \
+ /opt/syslinux/com32/include/bitsize/stdint.h \
+ /opt/syslinux/com32/include/bitsize32/stdint.h \
+ /opt/syslinux/com32/include/bitsize/stdintlimits.h \
+ /opt/syslinux/com32/include/bitsize32/stdintlimits.h \
+ /opt/syslinux/com32/include/bitsize/stdintconst.h \
+ /opt/syslinux/com32/include/bitsize32/stdintconst.h \
+ /opt/syslinux/com32/include/stdbool.h \
+ /opt/syslinux/com32/include/stddef.h \
+ /opt/syslinux/com32/include/bitsize/stddef.h \
+ /opt/syslinux/com32/include/bitsize32/stddef.h \
+ /opt/syslinux/com32/include/klibc/compiler.h \
+ /opt/syslinux/com32/include/stdlib.h \
+ /opt/syslinux/com32/include/klibc/extern.h \
+ /opt/syslinux/com32/include/stdio.h /opt/syslinux/com32/include/stdarg.h \
+ /usr/lib/gcc/x86_64-redhat-linux/8/include/stdarg.h \
+ /opt/syslinux/com32/include/ctype.h /opt/syslinux/com32/include/string.h \
+ /opt/syslinux/com32/include/console.h \
+ /opt/syslinux/com32/include/inttypes.h /opt/syslinux/com32/include/dev.h \
+ /opt/syslinux/com32/libutil/include/consoles.h \
+ /opt/syslinux/com32/libutil/include/minmax.h \
+ /opt/syslinux/com32/include/dprintf.h \
+ /opt/syslinux/com32/include/syslinux/debug.h \
+ /opt/syslinux/com32/include/errno.h /opt/syslinux/com32/include/unistd.h \
+ /opt/syslinux/com32/include/sys/types.h \
+ /opt/syslinux/com32/include/syslinux/loadfile.h \
+ /opt/syslinux/com32/include/syslinux/bootrm.h \
+ /opt/syslinux/com32/include/syslinux/movebits.h \
+ /opt/syslinux/com32/include/syslinux/config.h \
+ /opt/syslinux/com32/include/syslinux/disk.h \
+ /opt/syslinux/com32/include/syslinux/video.h \
+ /opt/syslinux/com32/chain/chain.h /opt/syslinux/com32/chain/utility.h \
+ /opt/syslinux/com32/chain/options.h /opt/syslinux/com32/chain/partiter.h \
+ /opt/syslinux/com32/chain/mangle.h

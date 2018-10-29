@@ -1,0 +1,97 @@
+GAS LISTING /tmp/ccPPzjB2.s 			page 1
+
+
+   1              	# 1 "/opt/syslinux/dos/header.S"
+   1              	STACK_SIZE	= 8192
+   1              	...
+   0              	
+   0              	
+   1              	/* Must be included first of all */
+   2              	#ifdef __ASSEMBLY__
+   3              		.code16
+   4              	#else
+   2              	HEAP_SIZE	= 16384
+   3              	
+   4              			.section ".header","a"
+   5              			.balign	512
+   6              	__header_start:
+   7 0000 4D5A     			.short	0x5a4d
+   8 0002 0000     			.short	_exe_edata_low
+   9 0004 0000     			.short	_exe_edata_blocks
+  10 0006 0000     			.short	0		/* Relocation count */
+  11 0008 2000     			.short	(__header_end - __header_start) >> 4
+  12 000a 0000     			.short	_exe_bss_paras
+  13 000c 0000     			.short	_exe_bss_paras
+  14 000e 0000     			.short	_exe_text_seg	/* SP */
+  15 0010 0000     			.short	__stack_end
+  16 0012 0000     			.short	0		/* Checksum */
+  17 0014 0000     			.short	_start
+  18 0016 0000     			.short	_exe_text_seg	/* CS */
+  19 0018 1C00     			.short	__reloc
+  20 001a 0000     			.short	0		/* Overlay number */
+  21              	/*
+  22              	 * Don't put these fields in unless we actually have an NE or PE image;
+  23              	 * some tools might get confused and assume __reloc = 64 automatically
+  24              	 * means an NE/PE image or a Windows image of some sort.
+  25              	 */
+  26              	#if 0
+  27              			.short	0		/* Unknown/pad? */
+  28              			.short	0		/* Unknown/pad? */
+  29              			.short	0		/* Unknown/pad? */
+  30              			.short	0		/* Unknown/pad? */
+  31              			.short	0		/* Unknown/pad? */
+  32              			.short	0		/* Unknown/pad? */
+  33              			.short	0		/* Unknown/pad? */
+  34              			.short	0		/* Unknown/pad? */
+  35              			.short	0		/* Unknown/pad? */
+  36              			.short	0		/* Unknown/pad? */
+  37              			.short	0		/* Unknown/pad? */
+  38              			.short	0		/* Unknown/pad? */
+  39              			.short	0		/* Unknown/pad? */
+  40              			.short	0		/* Unknown/pad? */
+  41              			.short	0		/* Unknown/pad? */
+  42              			.short	0		/* Unknown/pad? */
+  43              			.long	0		/* Pointer to Windows PE header */
+  44              	#endif
+  45              			.balign 4
+  46              	__reloc:
+  47 001c 00000000 			.balign	512
+  47      00000000 
+  47      00000000 
+GAS LISTING /tmp/ccPPzjB2.s 			page 2
+
+
+  47      00000000 
+  47      00000000 
+  48              	__header_end:
+  49              	
+  50              			.section ".heap","aw"
+  51 0000 00000000 			.space	HEAP_SIZE
+  51      00000000 
+  51      00000000 
+  51      00000000 
+  51      00000000 
+  52              	
+  53              			.section ".stack","aw"
+  54 0000 00000000 			.space	STACK_SIZE
+  54      00000000 
+  54      00000000 
+  54      00000000 
+  54      00000000 
+GAS LISTING /tmp/ccPPzjB2.s 			page 3
+
+
+DEFINED SYMBOLS
+/opt/syslinux/dos/header.S:1      *ABS*:0000000000002000 STACK_SIZE
+/opt/syslinux/dos/header.S:2      *ABS*:0000000000004000 HEAP_SIZE
+/opt/syslinux/dos/header.S:6      .header:0000000000000000 __header_start
+/opt/syslinux/dos/header.S:48     .header:0000000000000200 __header_end
+/opt/syslinux/dos/header.S:46     .header:000000000000001c __reloc
+
+UNDEFINED SYMBOLS
+_exe_edata_low
+_exe_edata_blocks
+_exe_bss_paras
+_exe_text_seg
+__stack_end
+_start

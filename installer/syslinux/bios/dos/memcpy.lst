@@ -1,0 +1,41 @@
+GAS LISTING /tmp/cc6HtKxQ.s 			page 1
+
+
+   1              	# 1 "/opt/syslinux/dos/memcpy.S"
+   1              	#
+   1              	...
+   0              	
+   0              	
+   1              	/* Must be included first of all */
+   2              	#ifdef __ASSEMBLY__
+   3              		.code16
+   4              	#else
+   2              	# memcpy.S
+   3              	#
+   4              	# Simple 16-bit memcpy() implementation
+   5              	#
+   6              	
+   7              		.text
+   8              		.code16gcc
+   9              		.globl memcpy
+  10              		.type memcpy, @function
+  11              	memcpy:
+  12 0000 FC       		cld
+  13 0001 57       		pushw %di
+  14 0002 56       		pushw %si
+  15 0003 89C7     		movw %ax,%di
+  16 0005 89D6     		movw %dx,%si
+  17              		# The third argument is already in cx
+  18 0007 F3A4     		rep ; movsb
+  19 0009 5E       		popw %si
+  20 000a 5F       		popw %di
+  21 000b 66C3     		ret
+  22              	
+  23              		.size memcpy,.-memcpy
+GAS LISTING /tmp/cc6HtKxQ.s 			page 2
+
+
+DEFINED SYMBOLS
+/opt/syslinux/dos/memcpy.S:11     .text:0000000000000000 memcpy
+
+NO UNDEFINED SYMBOLS

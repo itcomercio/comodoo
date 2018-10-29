@@ -1,0 +1,71 @@
+GAS LISTING /tmp/cc4vsDU1.s 			page 1
+
+
+   1              	# 1 "/opt/syslinux/dos/ldlinux.S"
+   1              	/*
+   1              	...
+   0              	
+   0              	
+   1              	/* Must be included first of all */
+   2              	#ifdef __ASSEMBLY__
+   3              		.code16
+   4              	#else
+   2              	 * Wrap ldlinux.sys and ldlinux.c32; this needs special handling for DOS.
+   3              	 */
+   4              	
+   5              		.section ".payload","aw"
+   6              		.balign	16
+   7              		.globl	syslinux_ldlinux, syslinux_ldlinux_size
+   8              	syslinux_ldlinux:
+   9 0000 0D0A5359 		.incbin "../core/ldlinux.sys"
+   9      534C494E 
+   9      55582036 
+   9      2E303420 
+   9      000D0A1A 
+  10 e262 00000000 		.space ((syslinux_ldlinux - .) & 511)
+  10      00000000 
+  10      00000000 
+  10      00000000 
+  10      00000000 
+  11              	syslinux_ldlinux_size	= . - syslinux_ldlinux
+  12              		.size	syslinux_ldlinux, .-syslinux_ldlinux
+  13              		.globl	syslinux_ldlinuxc32, syslinux_ldlinuxc32_size
+  14              	syslinux_ldlinuxc32:
+  15 e400 7F454C46 		.incbin "../com32/elflink/ldlinux/ldlinux.c32"
+  15      01010100 
+  15      00000000 
+  15      00000000 
+  15      03000300 
+  16 2a960 00000000 		.space ((syslinux_ldlinuxc32 - .) & 511)
+  16      00000000 
+  16      00000000 
+  16      00000000 
+  16      00000000 
+  17              	syslinux_ldlinuxc32_size = . - syslinux_ldlinuxc32
+  18              		.size	syslinux_ldlinuxc32, .-syslinux_ldlinuxc32
+  19              		.globl syslinux_size
+  20              	syslinux_size	= . - syslinux_ldlinux
+  21              	
+  22              		.section ".rodata","a"
+  23              		.balign	4
+  24              		.globl	syslinux_ldlinux_len
+  25              	syslinux_ldlinux_len:
+  26 0000 00E40000 		.long	syslinux_ldlinux_size
+  27              		.size	syslinux_ldlinux_len, .-syslinux_ldlinux_len
+  28              		.globl	syslinux_ldlinuxc32_len
+  29              	syslinux_ldlinuxc32_len:
+  30 0004 00C60100 		.long	syslinux_ldlinuxc32_size
+  31              		.size	syslinux_ldlinuxc32_len, .-syslinux_ldlinuxc32_len
+GAS LISTING /tmp/cc4vsDU1.s 			page 2
+
+
+DEFINED SYMBOLS
+/opt/syslinux/dos/ldlinux.S:8      .payload:0000000000000000 syslinux_ldlinux
+                            *ABS*:000000000000e400 syslinux_ldlinux_size
+/opt/syslinux/dos/ldlinux.S:14     .payload:000000000000e400 syslinux_ldlinuxc32
+                            *ABS*:000000000001c600 syslinux_ldlinuxc32_size
+                            *ABS*:000000000002aa00 syslinux_size
+/opt/syslinux/dos/ldlinux.S:25     .rodata:0000000000000000 syslinux_ldlinux_len
+/opt/syslinux/dos/ldlinux.S:29     .rodata:0000000000000004 syslinux_ldlinuxc32_len
+
+NO UNDEFINED SYMBOLS

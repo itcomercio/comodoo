@@ -1,0 +1,139 @@
+GAS LISTING /tmp/ccV7wN52.s 			page 1
+
+
+   1              	# 1 "/opt/syslinux/dos/crt0.S"
+   1              		.code16
+   1              	...
+   0              	
+   0              	
+   1              	/* Must be included first of all */
+   2              	#ifdef __ASSEMBLY__
+   3              		.code16
+   4              	#else
+   2              	
+   3              	#ifndef REGPARM
+   4              	# error "This file assumes -mregparm=3 -DREGPARM=3"
+   5              	#endif
+   6              	
+   7              		.section ".text","ax"
+   8              		.globl _start
+   9              		.type _start,@function
+  10              	_start:
+  11              		# Align the stack and make sure the high half is zero
+  12 0000 6681E4FC 		andl $0xfffc,%esp
+  12      FF0000
+  13              	
+  14              		# DS, ES points to the PSP at this point
+  15 0007 06       		pushw %es		# Save PSP pointer
+  16 0008 8CC8     		movw %cs,%ax
+  17 000a 8ED8     		movw %ax,%ds
+  18 000c 8EC0     		movw %ax,%es
+  19              	
+  20              		# Clear the .bss
+  21 000e FC       		cld
+  22 000f 6631C0   		xorl %eax,%eax
+  23 0012 BF0000   		movw $__bss_start,%di
+  24 0015 B90300   		movw $__bss_end+3,%cx
+  25 0018 29F9     		subw %di,%cx
+  26 001a C1E902   		shrw $2,%cx
+  27 001d F366AB   		rep ; stosl
+  28              	
+  29              		# Copy the PSP into our own segment
+  30 0020 0FA1     		popw %fs		# FS -> PSP
+  31 0022 BF0000   		movw $_PSP,%di
+  32 0025 31F6     		xorw %si,%si
+  33 0027 B94000   		movw $0x40,%cx
+  34 002a 64F366A5 		fs ; rep ; movsl
+  35              	
+  36              		# Verify that this is a supportable DOS version
+  37 002e B80130   		movw $0x3001,%ax
+  38 0031 CD21     		int $0x21
+  39 0033 86E0     		xchgb %ah,%al
+  40 0035 A30000   		movw %ax,dos_version
+  41 0038 3D1403   		cmpw $0x0314,%ax	# DOS >= 3.20?
+  42 003b 7309     		jae 1f			# If so, okay
+  43 003d BA0000   		movw $bad_dos,%dx	# Print error message
+  44 0040 B409     		movb $0x09,%ah
+  45 0042 CD21     		int $0x21
+  46 0044 CD20     		int $0x20		# Die
+  47              	
+  48              	1:
+GAS LISTING /tmp/ccV7wN52.s 			page 2
+
+
+  49              		# Compute argc and argv (assumes REGPARM)
+  50 0046 6650     		pushl %eax		# Make space for argv
+  51 0048 6689E0   		movl %esp,%eax
+  52 004b 66E8FCFF 		calll __parse_argv
+  52      FFFF
+  53 0051 6650     		pushl %eax		# argc
+  54              	
+  55              		# Initialize malloc
+  56 0053 66E8FCFF 		calll __init_memory_arena
+  56      FFFF
+  57              	
+  58              		# Now call main
+  59 0059 6658     		popl %eax		# argc
+  60 005b 665A     		popl %edx		# argv
+  61 005d 66E8FCFF 		calll main
+  61      FFFF
+  62              	
+  63              		# Here %eax is the exit code, fall through into exit
+  64              	
+  65              		.size _start,.-_start
+  66              	
+  67              		.globl exit
+  68              		.type exit,@function
+  69              	exit:
+  70              		# Exit code already in %eax
+  71 0063 B44C     		movb $0x4c,%ah		# Terminate program
+  72 0065 CD21     		int $0x21
+  73 0067 F4       	1:	hlt
+  74 0068 EBFD     		jmp 1b
+  75              		.size exit,.-exit
+  76              	
+  77              		.section ".rodata","a"
+  78              	bad_dos:
+  79 0000 556E7375 		.ascii "Unsupported DOS version\r\n$"
+  79      70706F72 
+  79      74656420 
+  79      444F5320 
+  79      76657273 
+  80              		.size bad_dos,.-bad_dos
+  81              	
+  82              		.section ".bss","aw"
+  83              		.balign 16
+  84              		.globl _PSP
+  85              	_PSP:
+  86 0000 00000000 		.space 256
+  86      00000000 
+  86      00000000 
+  86      00000000 
+  86      00000000 
+  87              		.size _PSP, .-_PSP
+  88              	
+  89              		/* Purely for sanity */
+  90              		.section ".null","a"
+  91 0000 00000000 		.long 0,0,0,0
+  91      00000000 
+  91      00000000 
+  91      00000000 
+GAS LISTING /tmp/ccV7wN52.s 			page 3
+
+
+GAS LISTING /tmp/ccV7wN52.s 			page 4
+
+
+DEFINED SYMBOLS
+/opt/syslinux/dos/crt0.S:10     .text:0000000000000000 _start
+/opt/syslinux/dos/crt0.S:85     .bss:0000000000000000 _PSP
+/opt/syslinux/dos/crt0.S:78     .rodata:0000000000000000 bad_dos
+/opt/syslinux/dos/crt0.S:69     .text:0000000000000063 exit
+
+UNDEFINED SYMBOLS
+__bss_start
+__bss_end
+dos_version
+__parse_argv
+__init_memory_arena
+main

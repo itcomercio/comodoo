@@ -1,0 +1,190 @@
+     1                                  		bits 16
+     2                                  
+     3                                  		section .text
+     4                                  
+     5                                  		; must be filled in
+     6 00000000 0000                    f_buf_size	dw 0
+     7 00000002 0000                    f_buf_seg	dw 0
+     8                                  
+     9                                  
+    10                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    11                                  gfx_cb:
+    12 00000004 0E                      		push cs
+    13 00000005 1F                      		pop ds
+    14                                  
+    15 00000006 3C07                    		cmp al,cb_len
+    16 00000008 730B                    		jae gfx_cb_80
+    17                                  
+    18 0000000A 0FB6D8                  		movzx bx,al
+    19 0000000D 01DB                    		add bx,bx
+    20 0000000F FF97[E200]              		call word [bx+cb_table]
+    21 00000013 EB02                    		jmp gfx_cb_90
+    22                                  
+    23                                  gfx_cb_80:
+    24 00000015 B0FF                    		mov al,0ffh
+    25                                  gfx_cb_90:
+    26 00000017 CB                      		retf
+    27                                  
+    28                                  
+    29                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    30                                  ; Return status info.
+    31                                  ;
+    32                                  ; return:
+    33                                  ;  edx		filename buffer (64 bytes)
+    34                                  ;
+    35                                  cb_status:
+    36 00000018 668CCA                  		mov edx,cs
+    37 0000001B 66C1E204                		shl edx,4
+    38 0000001F 6681C2[FA000000]        		add edx,f_name
+    39 00000026 30C0                    		xor al,al
+    40 00000028 C3                      		ret
+    41                                  
+    42                                  
+    43                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    44                                  ; Open file.
+    45                                  ;
+    46                                  ; return:
+    47                                  ;    al		0: ok, 1: file not found
+    48                                  ;   ecx		file length (al = 0)
+    49                                  ;
+    50                                  cb_fopen:
+    51 00000029 BE[FA00]                		mov si,f_name
+    52 0000002C 1E                      		push ds
+    53 0000002D 07                      		pop es
+    54 0000002E B80600                  		mov ax,6
+    55 00000031 CD22                    		int 22h
+    56 00000033 6692                    		xchg edx,eax
+    57 00000035 B001                    		mov al,1
+    58 00000037 722C                    		jc cb_fopen_90
+    59 00000039 3B0E[0000]              		cmp cx,[f_buf_size]
+    60 0000003D 7726                    		ja cb_fopen_90
+    61 0000003F 09C9                    		or cx,cx
+    62 00000041 7422                    		jz cb_fopen_90
+    63 00000043 890E[F200]              		mov [f_block_size],cx
+    64 00000047 6609D2                  		or edx,edx
+    65 0000004A 7419                    		jz cb_fopen_90
+    66 0000004C 8936[F000]              		mov [f_handle],si
+    67 00000050 668916[F600]            		mov [f_size],edx
+    68 00000055 6689D1                  		mov ecx,edx
+    69 00000058 A1[0000]                		mov ax,[f_buf_size]
+    70 0000005B 99                      		cwd
+    71 0000005C F736[F200]              		div word [f_block_size]
+    72 00000060 A3[F400]                		mov [f_blocks],ax
+    73                                  
+    74 00000063 30C0                    		xor al,al
+    75                                  cb_fopen_90:
+    76 00000065 C3                      		ret
+    77                                  
+    78                                  
+    79                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    80                                  ; Read next chunk.
+    81                                  ;
+    82                                  ; return:
+    83                                  ;   edx		buffer address (linear)
+    84                                  ;   ecx		data length (< 64k)
+    85                                  ;
+    86                                  cb_fread:
+    87 00000066 6631C9                  		xor ecx,ecx
+    88 00000069 8B36[F000]              		mov si,[f_handle]
+    89 0000006D 09F6                    		or si,si
+    90 0000006F 7417                    		jz cb_fread_80
+    91 00000071 8B0E[F400]              		mov cx,[f_blocks]
+    92 00000075 8E06[0200]              		mov es,[f_buf_seg]
+    93 00000079 31DB                    		xor bx,bx
+    94 0000007B B80700                  		mov ax,7
+    95 0000007E CD22                    		int 22h
+    96 00000080 8936[F000]              		mov [f_handle],si
+    97 00000084 B001                    		mov al,1
+    98 00000086 7202                    		jc cb_fread_90
+    99                                  cb_fread_80:
+   100 00000088 30C0                    		xor al,al
+   101                                  cb_fread_90:
+   102 0000008A 660FB716[0200]          		movzx edx,word [f_buf_seg]
+   103 00000090 66C1E204                		shl edx,4
+   104 00000094 C3                      		ret
+   105                                  
+   106                                  
+   107                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   108                                  ; Return current working directory.
+   109                                  ;
+   110                                  ; return:
+   111                                  ;  edx		filename
+   112                                  ;
+   113                                  cb_getcwd:
+   114 00000095 B81F00                  		mov ax,1fh
+   115 00000098 CD22                    		int 22h
+   116 0000009A 668CC2                  		mov edx,es
+   117 0000009D 66C1E204                		shl edx,4
+   118 000000A1 660FB7DB                		movzx ebx,bx
+   119 000000A5 6601DA                  		add edx,ebx
+   120 000000A8 30C0                    		xor al,al
+   121 000000AA C3                      		ret
+   122                                  
+   123                                  
+   124                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   125                                  ; Set current working directory.
+   126                                  ;
+   127                                  cb_chdir:
+   128 000000AB BB[FA00]                		mov bx,f_name
+   129 000000AE 1E                      		push ds
+   130 000000AF 07                      		pop es
+   131 000000B0 B82500                  		mov ax,25h
+   132 000000B3 CD22                    		int 22h
+   133 000000B5 30C0                    		xor al,al
+   134 000000B7 C3                      		ret
+   135                                  
+   136                                  
+   137                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   138                                  ; read sector
+   139                                  ;
+   140                                  ;  edx		sector
+   141                                  ;
+   142                                  ; return:
+   143                                  ;  edx		buffer (linear address)
+   144                                  ;
+   145                                  ;  Note: does not return on error!
+   146                                  ;
+   147                                  cb_readsector:
+   148 000000B8 6631FF                  		xor edi,edi
+   149 000000BB 6631F6                  		xor esi,esi
+   150 000000BE B90100                  		mov cx,1
+   151 000000C1 8E06[0200]              		mov es,[f_buf_seg]
+   152 000000C5 31DB                    		xor bx,bx
+   153 000000C7 B81900                  		mov ax,19h
+   154 000000CA CD22                    		int 22h
+   155 000000CC 660FB716[0200]          		movzx edx,word [f_buf_seg]
+   156 000000D2 66C1E204                		shl edx,4
+   157 000000D6 30C0                    		xor al,al
+   158 000000D8 C3                      		ret
+   159                                  
+   160                                  
+   161                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   162                                  ; Re-read fs structures.
+   163                                  ;
+   164                                  cb_mount:
+   165 000000D9 B82600                  		mov ax,26h
+   166 000000DC CD22                    		int 22h
+   167 000000DE 0F92C0                  		setc al
+   168 000000E1 C3                      		ret
+   169                                  
+   170                                  
+   171                                  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   172                                  ;
+   173                                  		align 2, db 0
+   174                                  
+   175 000000E2 [1800]                  cb_table	dw cb_status
+   176 000000E4 [2900]                  		dw cb_fopen
+   177 000000E6 [6600]                  		dw cb_fread
+   178 000000E8 [9500]                  		dw cb_getcwd
+   179 000000EA [AB00]                  		dw cb_chdir
+   180 000000EC [B800]                  		dw cb_readsector
+   181 000000EE [D900]                  		dw cb_mount
+   182                                  cb_len		equ ($-cb_table)/2
+   183                                  
+   184 000000F0 0000                    f_handle	dw 0
+   185 000000F2 0000                    f_block_size	dw 0
+   186 000000F4 0000                    f_blocks	dw 0
+   187 000000F6 00000000                f_size		dd 0
+   188 000000FA 00<rept>                f_name		times 64 db 0
+   189                                  f_name_len	equ $ - f_name
+   190                                  

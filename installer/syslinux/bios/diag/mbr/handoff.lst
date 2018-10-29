@@ -1,0 +1,466 @@
+GAS LISTING /tmp/ccUgEQk6.s 			page 1
+
+
+   1              	# 1 "/opt/syslinux/diag/mbr/handoff.S"
+   1              	/* -----------------------------------------------------------------------
+   1              	...
+   0              	
+   0              	
+   2              	 *
+   3              	 *   Copyright 2010-2011 Gene Cumm
+   4              	 *
+   5              	 *   Portions from mbr.S:
+   6              	 *   Copyright 2007-2009 H. Peter Anvin - All Rights Reserved
+   7              	 *   Copyright 2009 Intel Corporation; author: H. Peter Anvin
+   8              	 *
+   9              	 *   Permission is hereby granted, free of charge, to any person
+  10              	 *   obtaining a copy of this software and associated documentation
+  11              	 *   files (the "Software"), to deal in the Software without
+  12              	 *   restriction, including without limitation the rights to use,
+  13              	 *   copy, modify, merge, publish, distribute, sublicense, and/or
+  14              	 *   sell copies of the Software, and to permit persons to whom
+  15              	 *   the Software is furnished to do so, subject to the following
+  16              	 *   conditions:
+  17              	 *
+  18              	 *   The above copyright notice and this permission notice shall
+  19              	 *   be included in all copies or substantial portions of the Software.
+  20              	 *
+  21              	 *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  22              	 *   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  23              	 *   OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  24              	 *   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+  25              	 *   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  26              	 *   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  27              	 *   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  28              	 *   OTHER DEALINGS IN THE SOFTWARE.
+  29              	 *
+  30              	 * ----------------------------------------------------------------------- */
+  31              	
+  32              	/*
+  33              	 * handoff.S: MBR/VBR-like codeblock to display handoff data
+  34              	 *
+  35              	 * Displays the values of DL, DS, SI, the contents of [DS:SI] (16 bytes),
+  36              	 * the values of ES, DI, the contents of [ES:DI] (4 bytes), scans memory for
+  37              	 * $PnP then reports a boot failure.
+  38              	 *
+  39              	 * This should (hopefully) be only 8086 code
+  40              	 */
+  41              	
+  42              	/*
+  43              	 * Install instructions (assuming your target is /dev/dev; file or block device):
+  44              	 *
+  45              	 * MBR:
+  46              	 * dd conv=notrunc bs=440 count=1 if=handoff.bin of=/dev/dev
+  47              	 *
+  48              	 * VBR/PBR (should work for FAT12/16/32, ext[234]fs, btrfs):
+  49              	 * echo -en "\0353\0130\0220" |dd conv=notrunc bs=1 count=3 of=/dev/dev
+  50              	 * dd conv=notrunc bs=2 count=210 seek=45 if=handoff.bin of=/dev/dev
+  51              	 */
+  52              	
+  53              	// #define DEBUG_MARKER1	/* Insert markers in binary */
+GAS LISTING /tmp/ccUgEQk6.s 			page 2
+
+
+  54              	// #define DEBUG_START	/* Print entry addresses at start */
+  55              	// #define DEBUG_LOADE	/* movw versus pop */
+  56              	#define DEBUG_PNP	/* Scan for $PnP and show address */
+  57              	#define DEBUG_PAK	/* Press Any Key before boot fail */
+  58              	// #define DEBUG_ENTRY_REG	/* Store (manually as pusha is 80186) registers */
+  59              	// #define DEBUG_FDT	/* Print the floppy descriptor table; INT 1Eh*/
+  60              	
+  61              	#ifdef DEBUG_MARKER1
+  62              		.macro ASCII_MARKER1 s:vararg
+  63              		.ascii	\s
+  64              		.endm
+  65              	#else	/* DEBUG_MARKER1 */
+  66              		.macro ASCII_MARKER1 s:vararg
+  67              		.endm
+  68              	#endif	/* DEBUG_MARKER1 */
+  69              	
+  70              	#ifdef DEBUG_LOADE
+  71              		.macro LOADE r:req, t:req
+  72              		movw	(es_\r), %\t
+  73              		.endm
+  74              	#else	/* DEBUG_LOADE */
+  75              		.macro LOADE r:req, t:req
+  76              		popw %\t
+  77              		.endm
+  78              	#endif	/* DEBUG_LOADE */
+  79              	
+  80              		.code16
+  81              		.text
+  82              	
+  83              	entry		= 0x7c00
+  84              	stack		= (entry)
+  85              	e_start		= (stack)
+  86              	e_ax		= (e_start-2)
+  87              	e_ss		= (e_ax-2)
+  88              	e_sp		= (e_ss-2)
+  89              	e_bot		= (e_ss)
+  90              	/* Doubtful this will be used */
+  91              	e0_beg		= (e_bot)
+  92              	e0_ax		= (e0_beg-2)
+  93              	e0_cx		= (e0_ax-2)
+  94              	e0_dx		= (e0_cx-2)
+  95              	e0_bx		= (e0_dx-2)
+  96              	e0_sp		= (e0_bx-2)
+  97              	e0_bp		= (e0_sp-2)
+  98              	e0_si		= (e0_bp-2)
+  99              	e0_di		= (e0_si-2)
+ 100              	e0_ds		= (e0_di-2)
+ 101              	e0_es		= (e0_ds-2)
+ 102              	e0_bot		= (e0_es)
+ 103              	es_beg		= (e0_bot)	/* Original register values from entry point */
+ 104              	es_di		= (es_beg-2)
+ 105              	es_es		= (es_di-2)
+ 106              	es_si		= (es_es-2)
+ 107              	es_ds		= (es_si-2)
+ 108              	es_bot		= (es_ds)
+ 109              	
+ 110              	BIOS_page	= 0x462
+GAS LISTING /tmp/ccUgEQk6.s 			page 3
+
+
+ 111              	
+ 112              	int_1e		= (4*0x1e)
+ 113              	int_1e_seg	= (int_1e)
+ 114              	int_1e_off	= (int_1e+2)
+ 115              	
+ 116              		.globl	_start
+ 117              	_start:
+ 118 0000 FA       		cli
+ 119              	#ifdef DEBUG_ENTRY_REG
+ 120              		movw	%ax, e_ax
+ 121              		movw	%ss, e_ss
+ 122              		movw	%sp, e_sp
+ 123              	#endif /* DEBUG_ENTRY_REG */
+ 124 0001 31C0     		xorw	%ax, %ax
+ 125 0003 8ED0     		movw	%ax, %ss
+ 126              	#ifdef DEBUG_ENTRY_REG
+ 127              		movw	$e0_beg, %sp
+ 128              		/* pushaw */		/* 80186 */
+ 129              		pushw	%ax
+ 130              		pushw	%cx
+ 131              		pushw	%dx
+ 132              		pushw	%bx
+ 133              		pushw	%sp
+ 134              		pushw	%bp
+ 135              		pushw	%si
+ 136              		pushw	%di
+ 137              		pushw	%ds
+ 138              		pushw	%es
+ 139              	#else /* DEBUG_ENTRY_REG */
+ 140 0005 BCE87B   		movw	$es_beg, %sp
+ 141              	#endif /* DEBUG_ENTRY_REG */
+ 142 0008 57       		pushw	%di		/* es:di -> $PnP header */
+ 143 0009 06       		pushw	%es
+ 144 000a 56       		pushw	%si
+ 145 000b 1E       		pushw	%ds
+ 146 000c FB       		sti
+ 147 000d FC       		cld
+ 148 000e 0E       		pushw	%cs
+ 149 000f 1F       		popw	%ds
+ 150              	
+ 151              	#ifdef DEBUG_START
+ 152              		pushw	%dx
+ 153              		call	crlf
+ 154              		movw	$(_start),%dx	/* 0x0600 mbr.ld .text address */
+ 155              		call	wrhexw
+ 156              		call	crlf
+ 157              		call	caddr
+ 158              	caddr:
+ 159              		popw	%dx
+ 160              		subw	$(caddr - _start), %dx
+ 161              		call	wrhexw
+ 162              		call	crlf
+ 163              		popw	%dx
+ 164              	#endif	/* DEBUG_START */
+ 165              	
+ 166              		/* write DL */
+ 167 0010 E8CB00   	pr_dl:	call	wrstr
+GAS LISTING /tmp/ccUgEQk6.s 			page 4
+
+
+ 168 0013 444C3A20 		.ascii	"DL: \0"
+ 168      00
+ 169 0018 E8E700   		call	wrhexb
+ 170              		/* DS */
+ 171 001b E8C000   	pr_ds:	call	wrstr
+ 172 001e 20204453 		.ascii	"  DS: \0"
+ 172      3A2000
+ 173 0025 5A       		LOADE	ds, dx
+ 174 0026 52       		pushw	%dx
+ 175 0027 07       		popw	%es
+ 176 0028 E8E800   		call	wrhexw
+ 177              		/* SI */
+ 178 002b E8B000   	pr_si:	call	wrstr
+ 179 002e 20205349 		.ascii	"  SI: \0"
+ 179      3A2000
+ 180 0035 5A       		LOADE	si, dx
+ 181 0036 52       		pushw	%dx
+ 182 0037 5F       		popw	%di
+ 183 0038 E8D800   		call	wrhexw
+ 184 003b E8AD00   		call	crlf
+ 185              		/* DS:SI */
+ 186 003e B91000   		movw	$16, %cx
+ 187 0041 E8DE00   		call	wrhexbses
+ 188 0044 E8A400   		call	crlf
+ 189              	
+ 190              		/* ES */
+ 191 0047 E89400   	pr_es:	call	wrstr
+ 192 004a 45533A20 		.ascii	"ES: \0"
+ 192      00
+ 193 004f 5A       		LOADE	es, dx
+ 194 0050 52       		pushw	%dx
+ 195 0051 07       		popw	%es
+ 196 0052 E8BE00   		call	wrhexw
+ 197 0055 E88600   	pr_di:	call	wrstr
+ 198 0058 20204449 		.ascii	"  DI: \0"
+ 198      3A2000
+ 199 005f 5A       		LOADE	di, dx
+ 200 0060 52       		pushw	%dx
+ 201 0061 5F       		popw	%di
+ 202 0062 E8AE00   		call	wrhexw
+ 203 0065 E88300   		call	crlf
+ 204              		/* ES:DI */	/* %es:0(%di) */
+ 205 0068 B90400   		movw	$4, %cx
+ 206 006b E8B400   		call	wrhexbses
+ 207              	
+ 208              	#ifdef DEBUG_PNP
+ 209 006e 83EE04   		subw	$4, %si
+ 210 0071 26AD     		es lodsw
+ 211 0073 3D2450   		cmpw	$0x5024, %ax
+ 212 0076 7511     		jne	scn_pnp
+ 213 0078 26AD     		es lodsw
+ 214 007a 3D6E50   		cmpw	$0x506E, %ax
+ 215 007d 750A     		jne	scn_pnp
+ 216 007f E85C00   		call	wrstr
+ 217 0082 203D2450 		.ascii	" =$PnP\0"
+ 217      6E5000
+ 218              	scn_pnp:
+GAS LISTING /tmp/ccUgEQk6.s 			page 5
+
+
+ 219 0089 E85F00   		call	crlf
+ 220              		/* $PnP Scan */
+ 221 008c BA00F0   		movw	$0xf000, %dx
+ 222 008f 52       		pushw	%dx
+ 223 0090 07       		popw	%es
+ 224 0091 BE0000   		movw	$0, %si
+ 225 0094 B90010   		movw	$0x1000, %cx
+ 226              		/* 0x506E5024 */
+ 227 0097 BA2450   		movw	$0x5024, %dx
+ 228 009a BB6E50   		movw	$0x506E, %bx
+ 229 009d 26AD     	ch_pnp:	es lodsw	/* Check for $PnP */
+ 230 009f 39D0     		cmpw	%dx, %ax
+ 231 00a1 7506     		jne	ch_pnp_l
+ 232 00a3 26AD     		es lodsw
+ 233 00a5 39D8     		cmpw	%bx, %ax
+ 234 00a7 740A     		je	pr_pnp
+ 235              	ch_pnp_l:		/* Check $PnP failed; loop to next address */
+ 236 00a9 83C60E   		addw	$14, %si
+ 237 00ac 83E6F0   		andw	$0xFFF0, %si
+ 238 00af E2EC     		loopw	ch_pnp
+ 239 00b1 EB1E     		jmp	pnp_end
+ 240              	pr_pnp:
+ 241 00b3 56       		pushw	%si
+ 242 00b4 E82700   		call	wrstr
+ 243 00b7 24506E50 		.ascii	"$PnP-\0"
+ 243      2D00
+ 244 00bd 8CC2     		movw	%es, %dx
+ 245 00bf E85100   		call	wrhexw
+ 246 00c2 B03A     		movb	$':, %al
+ 247 00c4 E80C00   		call	wrchr
+ 248 00c7 5A       		popw	%dx
+ 249 00c8 83E2F0   		andw	$0xFFF0, %dx
+ 250 00cb E84500   		call	wrhexw
+ 251              	#endif	/* DEBUG_PNP */
+ 252 00ce E81A00   		call	crlf
+ 253              	pnp_end:
+ 254              	
+ 255              	#ifdef DEBUG_FDT
+ 256              		/* INT 1Eh: Floppy Parameter Table Pointer */
+ 257              	pr_1e:	call	wrstr
+ 258              		.ascii	"INT 1Eh: \0"
+ 259              		mov	$int_1e,%bx
+ 260              		les	(%bx),%di
+ 261              		pushw	%es
+ 262              		popw	%dx
+ 263              		call	wrhexw
+ 264              		movb	$':, %al
+ 265              		call	wrchr
+ 266              		pushw	%di
+ 267              		popw	%dx
+ 268              		call	wrhexw
+ 269              		call	crlf
+ 270              		/* [INT 1Eh] */
+ 271              		movw	$14, %cx
+ 272              		call	wrhexbses
+ 273              		call	crlf
+ 274              	#endif	/* DEBUG_FDT */
+GAS LISTING /tmp/ccUgEQk6.s 			page 6
+
+
+ 275              	
+ 276              	end:
+ 277 00d1 EB60     		jmp	bootfail
+ 278              	
+ 279              		ASCII_MARKER1	"wc"
+ 280              	wrchr:
+ 281 00d3 B40E     		movb	$0x0e, %ah
+ 282 00d5 8A3E6204 		movb	(BIOS_page), %bh
+ 283 00d9 B307     		movb	$0x07, %bl
+ 284 00db CD10     		int	$0x10		/* May destroy %bp */
+ 285 00dd C3       		ret
+ 286              	
+ 287              		ASCII_MARKER1	"ws"
+ 288              	wrstr:
+ 289 00de 5E       		pop	%si
+ 290              	wrstr_l:
+ 291 00df AC       		lodsb
+ 292 00e0 3C00     		cmpb	$0, %al
+ 293 00e2 7405     		je	wrstr_d
+ 294 00e4 E8ECFF   		call	wrchr
+ 295 00e7 EBF6     		jmp	wrstr_l
+ 296              	wrstr_d:
+ 297 00e9 56       		push	%si
+ 298 00ea C3       		ret
+ 299              	
+ 300              	crlf:
+ 301 00eb E8F0FF   		call	wrstr
+ 302 00ee 0D0A00   		.ascii	"\r\n\0"
+ 303 00f1 C3       		ret
+ 304              	
+ 305              		ASCII_MARKER1	"hx"
+ 306              	wrhexn:
+ 307 00f2 240F     		and	$0x0F, %al
+ 308 00f4 3C0A     		cmpb	$10, %al
+ 309 00f6 7304     		jae	.alph
+ 310 00f8 0430     		addb	$'0, %al
+ 311 00fa EB02     		jmp	.wc
+ 312              	.alph:
+ 313 00fc 0437     		addb	$('A - 10), %al
+ 314              	.wc:
+ 315 00fe E8D2FF   		call wrchr
+ 316 0101 C3       		ret
+ 317              	
+ 318              	wrhexb:
+ 319 0102 51       		pushw	%cx
+ 320 0103 88D0     		movb	%dl, %al
+ 321 0105 50       		pushw	%ax
+ 322 0106 B104     		movb	$4, %cl
+ 323 0108 D3C8     		rorw	%cl, %ax
+ 324 010a E8E5FF   		call	wrhexn
+ 325 010d 58       		popw	%ax
+ 326 010e E8E1FF   		call	wrhexn
+ 327 0111 59       		popw	%cx
+ 328 0112 C3       		ret
+ 329              	
+ 330              	wrhexw:
+ 331 0113 51       		pushw	%cx
+GAS LISTING /tmp/ccUgEQk6.s 			page 7
+
+
+ 332 0114 B108     		movb	$8, %cl
+ 333 0116 D3CA     		rorw	%cl, %dx
+ 334 0118 E8E7FF   		call wrhexb
+ 335 011b D3CA     		rorw	%cl, %dx
+ 336 011d E8E2FF   		call wrhexb
+ 337 0120 59       		popw	%cx
+ 338 0121 C3       		ret
+ 339              	
+ 340              		ASCII_MARKER1	"HE"
+ 341              	wrhexbses:
+ 342 0122 57       		pushw	%di
+ 343 0123 5E       		popw	%si
+ 344              	wrhexbses_l:
+ 345 0124 B020     		movb	$' , %al
+ 346 0126 E8AAFF   		call	wrchr
+ 347 0129 26AC     		es lodsb
+ 348 012b 89C2     		movw	%ax, %dx
+ 349 012d E8D2FF   		call	wrhexb
+ 350 0130 E2F2     		loop	wrhexbses_l
+ 351 0132 C3       		ret
+ 352              	
+ 353              	data:
+ 354              		ASCII_MARKER1	"bf"
+ 355              	bootfail:
+ 356              	#ifdef DEBUG_PAK
+ 357 0133 E8A8FF   		call wrstr
+ 358 0136 0D0A0D0A 		.ascii	"\r\n\r\nPress any key\r\n\0"
+ 358      50726573 
+ 358      7320616E 
+ 358      79206B65 
+ 358      790D0A00 
+ 359 014a 31C0     		xor	%ax, %ax
+ 360 014c CD16     		int	$0x16
+ 361              	#endif
+ 362 014e CD18     		int	$0x18		/* Boot failure */
+ 363              	die:
+ 364 0150 F4       		hlt
+ 365 0151 EBFD     		jmp	die
+GAS LISTING /tmp/ccUgEQk6.s 			page 8
+
+
+DEFINED SYMBOLS
+/opt/syslinux/diag/mbr/handoff.S:83     *ABS*:0000000000007c00 entry
+/opt/syslinux/diag/mbr/handoff.S:84     *ABS*:0000000000007c00 stack
+/opt/syslinux/diag/mbr/handoff.S:85     *ABS*:0000000000007c00 e_start
+/opt/syslinux/diag/mbr/handoff.S:86     *ABS*:0000000000007bfe e_ax
+/opt/syslinux/diag/mbr/handoff.S:87     *ABS*:0000000000007bfc e_ss
+/opt/syslinux/diag/mbr/handoff.S:88     *ABS*:0000000000007bfa e_sp
+/opt/syslinux/diag/mbr/handoff.S:89     *ABS*:0000000000007bfc e_bot
+/opt/syslinux/diag/mbr/handoff.S:91     *ABS*:0000000000007bfc e0_beg
+/opt/syslinux/diag/mbr/handoff.S:92     *ABS*:0000000000007bfa e0_ax
+/opt/syslinux/diag/mbr/handoff.S:93     *ABS*:0000000000007bf8 e0_cx
+/opt/syslinux/diag/mbr/handoff.S:94     *ABS*:0000000000007bf6 e0_dx
+/opt/syslinux/diag/mbr/handoff.S:95     *ABS*:0000000000007bf4 e0_bx
+/opt/syslinux/diag/mbr/handoff.S:96     *ABS*:0000000000007bf2 e0_sp
+/opt/syslinux/diag/mbr/handoff.S:97     *ABS*:0000000000007bf0 e0_bp
+/opt/syslinux/diag/mbr/handoff.S:98     *ABS*:0000000000007bee e0_si
+/opt/syslinux/diag/mbr/handoff.S:99     *ABS*:0000000000007bec e0_di
+/opt/syslinux/diag/mbr/handoff.S:100    *ABS*:0000000000007bea e0_ds
+/opt/syslinux/diag/mbr/handoff.S:101    *ABS*:0000000000007be8 e0_es
+/opt/syslinux/diag/mbr/handoff.S:102    *ABS*:0000000000007be8 e0_bot
+/opt/syslinux/diag/mbr/handoff.S:103    *ABS*:0000000000007be8 es_beg
+/opt/syslinux/diag/mbr/handoff.S:104    *ABS*:0000000000007be6 es_di
+/opt/syslinux/diag/mbr/handoff.S:105    *ABS*:0000000000007be4 es_es
+/opt/syslinux/diag/mbr/handoff.S:106    *ABS*:0000000000007be2 es_si
+/opt/syslinux/diag/mbr/handoff.S:107    *ABS*:0000000000007be0 es_ds
+/opt/syslinux/diag/mbr/handoff.S:108    *ABS*:0000000000007be0 es_bot
+/opt/syslinux/diag/mbr/handoff.S:110    *ABS*:0000000000000462 BIOS_page
+/opt/syslinux/diag/mbr/handoff.S:112    *ABS*:0000000000000078 int_1e
+/opt/syslinux/diag/mbr/handoff.S:113    *ABS*:0000000000000078 int_1e_seg
+/opt/syslinux/diag/mbr/handoff.S:114    *ABS*:000000000000007a int_1e_off
+/opt/syslinux/diag/mbr/handoff.S:117    .text:0000000000000000 _start
+/opt/syslinux/diag/mbr/handoff.S:167    .text:0000000000000010 pr_dl
+/opt/syslinux/diag/mbr/handoff.S:288    .text:00000000000000de wrstr
+/opt/syslinux/diag/mbr/handoff.S:318    .text:0000000000000102 wrhexb
+/opt/syslinux/diag/mbr/handoff.S:171    .text:000000000000001b pr_ds
+/opt/syslinux/diag/mbr/handoff.S:330    .text:0000000000000113 wrhexw
+/opt/syslinux/diag/mbr/handoff.S:178    .text:000000000000002b pr_si
+/opt/syslinux/diag/mbr/handoff.S:300    .text:00000000000000eb crlf
+/opt/syslinux/diag/mbr/handoff.S:341    .text:0000000000000122 wrhexbses
+/opt/syslinux/diag/mbr/handoff.S:191    .text:0000000000000047 pr_es
+/opt/syslinux/diag/mbr/handoff.S:197    .text:0000000000000055 pr_di
+/opt/syslinux/diag/mbr/handoff.S:218    .text:0000000000000089 scn_pnp
+/opt/syslinux/diag/mbr/handoff.S:229    .text:000000000000009d ch_pnp
+/opt/syslinux/diag/mbr/handoff.S:235    .text:00000000000000a9 ch_pnp_l
+/opt/syslinux/diag/mbr/handoff.S:240    .text:00000000000000b3 pr_pnp
+/opt/syslinux/diag/mbr/handoff.S:253    .text:00000000000000d1 pnp_end
+/opt/syslinux/diag/mbr/handoff.S:280    .text:00000000000000d3 wrchr
+/opt/syslinux/diag/mbr/handoff.S:276    .text:00000000000000d1 end
+/opt/syslinux/diag/mbr/handoff.S:355    .text:0000000000000133 bootfail
+/opt/syslinux/diag/mbr/handoff.S:290    .text:00000000000000df wrstr_l
+/opt/syslinux/diag/mbr/handoff.S:296    .text:00000000000000e9 wrstr_d
+/opt/syslinux/diag/mbr/handoff.S:306    .text:00000000000000f2 wrhexn
+/opt/syslinux/diag/mbr/handoff.S:312    .text:00000000000000fc .alph
+/opt/syslinux/diag/mbr/handoff.S:314    .text:00000000000000fe .wc
+/opt/syslinux/diag/mbr/handoff.S:344    .text:0000000000000124 wrhexbses_l
+/opt/syslinux/diag/mbr/handoff.S:353    .text:0000000000000133 data
+/opt/syslinux/diag/mbr/handoff.S:363    .text:0000000000000150 die
+GAS LISTING /tmp/ccUgEQk6.s 			page 9
+
+
+
+NO UNDEFINED SYMBOLS
