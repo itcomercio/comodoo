@@ -159,7 +159,7 @@ def exec_with_pulse_progress(command, argv, stdin=0, stdout=1, stderr=2,
 
         stdout.write(s)
         if progress:
-            progress.pulse()
+            progress.gauge_update(50)
 
         if len(s) < 1:
             break
@@ -168,8 +168,6 @@ def exec_with_pulse_progress(command, argv, stdin=0, stdout=1, stderr=2,
         (pid, status) = os.waitpid(childpid, 0)
     except OSError, (num, msg):
         log.critical("exception from waitpid: %s %s" % (num, msg))
-
-    progress and progress.pop()
 
     # *shrug*  no clue why this would happen, but hope that things are fine
     if status is None:
@@ -359,14 +357,14 @@ class DiskSet:
 
         return 0
 
-    def format_disk(self, w, devicePath, formattool):
+    def format_disk(self, window, devicePath, formattool):
 
         rc = exec_with_pulse_progress(formattool[0],
                                       [formattool[1],
                                        devicePath],
                                       stdout="/tmp/resize.out",
                                       stderr="/tmp/resize.out",
-                                      progress=w);
+                                      progress=window);
 
 
 class BspImage:
@@ -384,7 +382,7 @@ class BspImage:
 
         self.total = len(self.list_of_names)
 
-    def transfer_files(self, w):
+    def transfer_files(self, window):
         os.mkdir(INSTALLDEST)
         # FIXME: hard coded
         isys.mount(self.disk + "3", INSTALLDEST, fstype="ext3")
@@ -395,8 +393,7 @@ class BspImage:
         for filename in self.list_of_names:
             try:
                 f = self.tar.extract(filename, self.outputdir)
-                w.set_label(filename)
-                w.pulse()
+                self.screen.gauge_update(50)
             except KeyError:
                 print 'ERROR: Did not find %s in tar archive' % filename
 
@@ -454,14 +451,14 @@ class Installer:
         # Format
         self.screen.pause(MSG_BOOTPART_READY, None, None, 2)
         self.screen.gauge_start(MSG_FORMAT_BOOT, None, None, 1)
-        self.screen.gauge_update(10)
 
         if not self.options.devel:
-            ds.format_disk(w, self.targetdisk + "1", fstype2tool["ext3"])
+            ds.format_disk(self.screen, self.targetdisk + "1",
+                           fstype2tool[ "ext3"])
         else:
             time.sleep(3)
 
-        self.screen.gauge_update(50)
+        self.screen.gauge_update(90)
         time.sleep(3)
         self.screen.gauge_update(100, MSG_FORMAT_OK)
         time.sleep(2)
@@ -471,11 +468,12 @@ class Installer:
         self.screen.gauge_update(10)
 
         if not self.options.devel:
-            ds.format_disk(w, self.targetdisk + "3", fstype2tool["ext3"])
+            ds.format_disk(self.screen, self.targetdisk + "3",
+                           fstype2tool["ext3"])
         else:
             time.sleep(3)
 
-        self.screen.gauge_update(50)
+        self.screen.gauge_update(90)
         time.sleep(3)
         self.screen.gauge_update(100, MSG_FORMAT_OK)
         time.sleep(2)
@@ -484,11 +482,12 @@ class Installer:
         self.screen.gauge_start(MSG_FORMAT_SWAP, None, None, 1)
         self.screen.gauge_update(10)
         if not self.options.devel:
-            ds.format_disk(w, self.targetdisk + "2", fstype2tool["swap"])
+            ds.format_disk(self.screen, self.targetdisk + "2",
+                           fstype2tool["swap"])
         else:
             time.sleep(3)
 
-        self.screen.gauge_update(50)
+        self.screen.gauge_update(90)
         time.sleep(3)
         self.screen.gauge_update(100, MSG_FORMAT_OK)
         time.sleep(2)
@@ -508,9 +507,9 @@ class Installer:
         self.screen.gauge_update(10)
 
         if not self.options.devel:
-            tb.transfer_files(w)
+            tb.transfer_files(self.screen)
 
-        self.screen.gauge_update(10)
+        self.screen.gauge_update(90)
         time.sleep(2)
         self.screen.gauge_update(100, MSG_BSP_OK)
         time.sleep(2)
@@ -557,6 +556,14 @@ class Installer:
 
 def main():
     setup_python_path()
+
+    #console = os.ttyname(sys.stdout.fileno())
+
+    #with open(console, 'rb') as inf, open(console, 'wb') as outf:
+    #    os.dup2(inf.fileno(), 0)
+    #    os.dup2(outf.fileno(), 1)
+    #    os.dup2(outf.fileno(), 2)
+
     options = parse_args()
 
     if options.devel:

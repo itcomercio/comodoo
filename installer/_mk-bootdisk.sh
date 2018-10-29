@@ -958,7 +958,7 @@ INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
-ps gdb netstat test less id systemctl"
+ps gdb netstat test less id systemctl chvt tty"
 
 # TODO: nash missing
 # TODO: grub missing

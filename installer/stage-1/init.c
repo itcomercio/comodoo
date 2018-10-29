@@ -321,7 +321,8 @@ static int setupTerminal(int fd) {
         env[ENV_TERM] = "TERM=vt320";
     } else {
         /* use the no-advanced-video vt100 definition */
-        env[ENV_TERM] = "TERM=vt100-nav";
+        //env[ENV_TERM] = "TERM=vt100-nav";
+        env[ENV_TERM] = "TERM=linux";
 
         /* unless the user specifies that they want utf8 */
         if ((fdn = open("/proc/cmdline", O_RDONLY, 0)) != -1) {

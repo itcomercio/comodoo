@@ -2221,7 +2221,8 @@ int main(int argc, char **argv) {
     
     stopNewt();
     closeLog();
-    
+
+
     if (!FL_TESTING(flags)) {
         int pid, status, rc;
         char *fmt;
@@ -2240,6 +2241,21 @@ int main(int argc, char **argv) {
 
         if (!(pid = fork())) {
             setenv("ANACONDAVERSION", VERSION, 1);
+                int fd = 0;
+
+            fd = open("/dev/tty", O_RDONLY);
+            close(STDIN_FILENO);
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+            fd = open("/dev/tty", O_WRONLY);
+            close(STDOUT_FILENO);
+            dup2(fd, STDOUT_FILENO);
+            close(STDERR_FILENO);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+
+            execl("/bin/bash", "/bin/bash", "-i", NULL);
+
             if (execv(anacondaArgs[0], NULL) == -1) {
                fprintf(stderr,"exec of anaconda failed, %s: %m\n", anacondaArgs[0]);
                exit(1);
