@@ -846,6 +846,18 @@ mkdir -p ${MKB_DIR}/run/udev
 echo_note "OK" "[OK]"
 
 #
+# Builds "syslinux" bootloader utilities
+#
+echo_note "WARNING" "[003] syslinux building ...."
+echo "############### syslinux #########" >> ${LOGS_DIR}/build.log
+make -C syslinux &>> ${LOGS_DIR}/build.log
+if [ $? = 0 ];then
+    echo_note "OK" "[OK]"
+else
+    echo_note "ERROR" "[ERROR]"
+fi
+
+#
 # syslinux building phase
 #
 echo_note "WARNING" "[002] syslinux installation ...."
@@ -857,6 +869,7 @@ cp syslinux/bios/com32/elflink/ldlinux/ldlinux.c32 ${MKB_SYSLINUX}/isolinux
 cp syslinux/bios/com32/lib/libcom32.c32 ${MKB_SYSLINUX}/isolinux
 cp syslinux/bios/com32/libutil/libutil.c32 ${MKB_SYSLINUX}/isolinux
 echo_note "OK" "[OK]"
+
 
 #
 # Builds "isys" installer utility functions

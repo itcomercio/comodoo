@@ -51,3 +51,6 @@ xorriso
 
 echo_note "OK" "Packages installed!"
 
+echo_note "WARNING" "Expanding Syslinux folder"
+tar xzf addons/syslinux-6.04-pre1.tar.gz && mv syslinux-6.04-pre1 syslinux
+
