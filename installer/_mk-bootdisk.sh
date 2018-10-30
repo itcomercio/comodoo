@@ -570,7 +570,7 @@ INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
-ps gdb netstat test less ss coreutils"
+ps gdb netstat test less ss coreutils basename"
 
 INSTALL_SBIN=" blockdev chroot dmsetup eject fdisk \
 insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
@@ -622,9 +622,11 @@ done
 echo_note "OK" "[OK]"
 
 echo_note "WARNING" "copy anaconda installer to $PKGDEST/usr/bin/"
-cp -v ${TOP_DIR}/stage-2/anaconda $PKGDEST/usr/bin/
+cp -v ${TOP_DIR}/stage-2/anaconda $PKGDEST/usr/bin/ \
+                            &>> ${LOGS_DIR}/second-stage.log
 # moved usr/lib/anaconda further
-cp -v ${TOP_DIR}/isys/_isys.so ${TOP_DIR}/stage-2/usr/lib/anaconda/
+cp -v ${TOP_DIR}/isys/_isys.so ${TOP_DIR}/stage-2/usr/lib/anaconda/ \
+                            &>> ${LOGS_DIR}/second-stage.log
 
 mv $PKGDEST/bin/* $PKGDEST/usr/bin
 echo_note "OK" "[OK]"
@@ -655,23 +657,12 @@ pushd ${TOP_DIR}/stage-2
 cp -a usr/ $PKGDEST
 popd
 
-# grub
-for i in /usr/lib/grub/i386-pc/* ; do
-    install -m 644 $i ${PKGDEST}/usr/lib/grub/i386-pc/${i##*/}
-done
-
+# New Grub2
 echo_note "WARNING" "setting up GRUB loader staff ..."
-mkdir -p $PKGDEST/usr/share/grub/
-
-cat <<EOF > $PKGDEST/usr/bin/grub-install
-#!/bin/bash
-/sbin/grub --batch <<! 1>/dev/null 2>/dev/null
-root (hd0,0)
-setup (hd0)
-quit
-!
-EOF
-chmod 755 $PKGDEST/usr/bin/grub-install
+for i in /usr/lib/grub/i386-pc/* ; do
+    install -m 644 $i ${PKGDEST}/usr/lib/grub/i386-pc/${i##*/} \
+                            &>> ${LOGS_DIR}/second-stage.log
+done
 echo_note "OK" "[OK]"
 
 rm -rf $PKGDEST/boot $PKGDEST/home $PKGDEST/root $PKGDEST/tmp
@@ -1007,7 +998,11 @@ instbin /usr/lib/systemd systemd-udevd $MKB_DIR /usr/lib/systemd/systemd-udev \
     &>> ${LOGS_DIR}/initrd-population.log
 instbin / /usr/bin/coreutils $MKB_DIR /usr/bin/coreutils \
     &>> ${LOGS_DIR}/initrd-population.log
+
+# Udisksd related stuff
 instbin / /usr/libexec/udisks2/udisksd $MKB_DIR /usr/libexec/udisks2/udisksd \
+    &>> ${LOGS_DIR}/initrd-population.log
+instbin / /usr/lib64/libbd_swap.so.2 $MKB_DIR /usr/lib64/libbd_swap.so.2 \
     &>> ${LOGS_DIR}/initrd-population.log
 
 # NSS files for dbus-daemon
@@ -1177,7 +1172,7 @@ cp -a /etc/NetworkManager/nm-system-settings.conf $MKB_DIR/etc/NetworkManager
 
 echo_note "OK" "[OK]"
 
-echo_note "WARNING" "[012] sfdisk.in file configuration"
+#echo_note "WARNING" "[012] sfdisk.in file configuration"
 # Partitioning
 
 #sfdisk -f -uS -D /dev/sdb << EOF
@@ -1185,11 +1180,11 @@ echo_note "WARNING" "[012] sfdisk.in file configuration"
 #
 #EOF
 
-cat > $MKB_DIR/etc/sfdisk.in <<!
-2028,100,S
-;
-!
-echo_note "OK" "[OK]"
+#cat > $MKB_DIR/etc/sfdisk.in <<!
+#,100,S
+#;
+# !
+# echo_note "OK" "[OK]"
 
 # Indirect dependencies: FIXME
 #install -m 755 /lib/libfreebl3.so $MKB_DIR/lib/

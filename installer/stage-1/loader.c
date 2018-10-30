@@ -2264,6 +2264,9 @@ int main(int argc, char **argv) {
                 }
             }
             waitpid(pid, &status, 0);
+        } else {
+            /* if error expand a shell for debuging */
+            execl("/bin/bash", "/bin/bash", "-i", NULL);
         }
 
         stop_fw_loader(&loaderData);
