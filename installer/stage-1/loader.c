@@ -1929,7 +1929,9 @@ int main(int argc, char **argv) {
         logMessage(ERROR, "writeDisabledNetInfo failure: %d", i);
     }
 
-    /* Start NetworkManager now so it's always available to talk to. */
+    /*
+     * We dont't need NetworkManager in this installation Stage.
+     *
     dbus_error_init(&error);
     logMessage(INFO, "dbus_bus_get ...");
     connection = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
@@ -1948,6 +1950,8 @@ int main(int argc, char **argv) {
                        __LINE__, rc, error_str ? error_str : "unknown");
         }
     }
+     *
+     */
 
     if (!FL_CMDLINE(flags))
         startNewt();
@@ -1979,6 +1983,7 @@ int main(int argc, char **argv) {
     if (FL_TELNETD(flags))
         startTelnetd(&loaderData);
 
+    /* Second stage media mounting */
     url = doLoaderMain(&loaderData, modInfo);
 
     /*

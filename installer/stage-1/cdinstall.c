@@ -294,10 +294,22 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
     struct device ** devices;
     char *cddev = NULL;
 
+    /*
+     * In this step we try detect a CDROM media. If this detection
+     * fails, we try a device disk dectection, usually an USB memory
+     * stick with the installation ISO burned (with dd tool).
+     * So it's a Usb Mass Storage device with iso9660 format.
+     */
     devices = getDevices(DEVICE_CDROM);
     if (!devices) {
         logMessage(ERROR, "got to setupCdrom without a CD device");
-        return NULL;
+    } else {
+            devices = getDevices(DEVICE_DISK);
+            if (!devices) {
+                logMessage(ERROR, "Not CD device or usb stick detected");
+                return NULL;
+            }
+            logMessage(INFO, "USB Mass Storage stick detected");
     }
 
     if (asprintf(&stage2loc, "%s/images/install.img", location) == -1) {
@@ -375,7 +387,10 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
                     /* aid system recovery.                                   */
                     if (FL_RESCUE(flags) && !FL_TEXT(flags) &&
                         totalMemory() > 128000) {
-			/* copia /mnt/stage2/images/install.img a /tmp/install.img */
+			            /*
+			             * copy /mnt/stage2/images/install.img to
+			             * /tmp/install.img
+			             */
                         rc = copyFile(stage2loc, "/tmp/install.img");
                         stage2img = strdup("/tmp/install.img");
                         stage2inram = 1;
@@ -384,7 +399,9 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
                         stage2inram = 0;
                     }
 
-		    /* monta en loopback el stage-2 installer */
+		            /*
+		             * loopback mounting of stage-2 installer
+		             */
                     rc = mountStage2(stage2img);
                     free(stage2img);
 
