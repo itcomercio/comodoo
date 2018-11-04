@@ -1300,7 +1300,8 @@ static char *doLoaderMain(struct loaderData_s *loaderData,
     }
 
     i = 0;
-    step = STEP_LANG;
+    //step = STEP_LANG;
+    step = STEP_STAGE2;
 
     while (step != STEP_DONE) {
         switch(step) {
@@ -1583,9 +1584,6 @@ static char *doLoaderMain(struct loaderData_s *loaderData,
                 if (!url) {
                     step = STEP_IP;
                     loaderData->ipinfo_set = 0;
-#ifdef ENABLE_IPV6
-                    loaderData->ipv6info_set = 0;
-#endif
                     loaderData->method = -1;
                     skipMethodDialog = 0;
                     dir = -1;
@@ -1983,14 +1981,15 @@ int main(int argc, char **argv) {
     if (FL_TELNETD(flags))
         startTelnetd(&loaderData);
 
-    /* Second stage media mounting */
+    /*
+     * Second stage media mounting
+     */
     url = doLoaderMain(&loaderData, modInfo);
 
     /*
      * Javi Debug: unconment for debugging
      */
     //doShell();
-
 
     if (!FL_TESTING(flags)) {
         int ret;

@@ -36,6 +36,7 @@
 #include <asm/types.h>
 #include <limits.h>
 #include <linux/cdrom.h>
+#include <stdio.h>
 
 #include "kickstart.h"
 #include "loader.h"
@@ -50,6 +51,7 @@
 
 #include "../isys/imount.h"
 #include "../isys/isys.h"
+#include "../syslinux/com32/include/fcntl.h"
 
 /* boot flags */
 extern uint64_t flags;
@@ -115,7 +117,7 @@ static int waitForCdromTrayClose(int fd) {
         if (prev == INT_MAX || prev != rc) {
             status = cdrom_drive_status(rc);
             if (status != NULL) {
-                logMessage(INFO, "drive status is %s", status);
+                logMessage(INFO, "drive status is .%s.", status);
             } else {
                 logMessage(INFO, "drive status is unknown status code %d", rc);
             }
@@ -293,6 +295,7 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
     char *retbuf = NULL, *stage2loc, *stage2img;
     struct device ** devices;
     char *cddev = NULL;
+    char *devwithpart = NULL;
 
     /*
      * In this step we try detect a CDROM media. If this detection
@@ -303,13 +306,12 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
     devices = getDevices(DEVICE_CDROM);
     if (!devices) {
         logMessage(ERROR, "got to setupCdrom without a CD device");
-    } else {
-            devices = getDevices(DEVICE_DISK);
-            if (!devices) {
+        devices = getDevices(DEVICE_DISK);
+        if (!devices) {
                 logMessage(ERROR, "Not CD device or usb stick detected");
                 return NULL;
-            }
-            logMessage(INFO, "USB Mass Storage stick detected");
+        }
+        logMessage(INFO, "USB Mass Storage stick detected");
     }
 
     if (asprintf(&stage2loc, "%s/images/install.img", location) == -1) {
@@ -325,6 +327,26 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
             char *tmp = NULL;
             int fd;
 
+            logMessage(INFO, "Device: %s, Description: %s",
+                    devices[i]->device, devices[i]->description);
+
+            switch(devices[i]->type) {
+                case DEVICE_ANY:
+                    logMessage(INFO, "Device type ANY");
+                    break;
+                case DEVICE_NETWORK:
+                    logMessage(INFO, "Device type NETWORK");
+                    break;
+                case DEVICE_CDROM:
+                    logMessage(INFO, "Device type CDROM");
+                    break;
+                case DEVICE_DISK:
+                    logMessage(INFO, "Device type DISK");
+                    break;
+                default:
+                    logMessage(INFO, "Device type UNKNOW");
+            }
+
             if (!devices[i]->device)
                 continue;
 
@@ -338,22 +360,32 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
                 devices[i]->device = tmp;
             }
 
+            devwithpart = malloc(256);
+            sprintf(devwithpart, "%s%s", devices[i]->device, "1");
+
             logMessage(INFO, "trying to mount CD device %s on %s",
-                       devices[i]->device, location);
+                       devwithpart, location);
 
             if (!FL_CMDLINE(flags))
-                winStatus(60, 3, _("Scanning"), _("Looking for installation images on CD device %s"), devices[i]->device);
+                winStatus(60, 3,
+                        _("Scanning"),
+                        _("Looking for installation images on CD device %s"),
+                        devwithpart);
             else
                 printf(_("Looking for installation images on CD device %s"), devices[i]->device);
 
-            fd = open(devices[i]->device, O_RDONLY | O_NONBLOCK);
+            //fd = open(devices[i]->device, O_RDONLY | O_NONBLOCK);
+            fd = open(devwithpart, O_RDONLY | O_NONBLOCK);
             if (fd < 0) {
-                logMessage(ERROR, "Couldn't open %s: %m", devices[i]->device);
+                //logMessage(ERROR, "Couldn't open %s: %m", devices[i]->device);
+                logMessage(ERROR, "Couldn't open %s: %m", devwithpart);
                 if (!FL_CMDLINE(flags))
                     newtPopWindow();
                 continue;
             }
 
+            logMessage(INFO, "waitForCdromTrayClose %s", devwithpart);
+            /*
             rc = waitForCdromTrayClose(fd);
             close(fd);
             switch (rc) {
@@ -370,17 +402,23 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
                 default:
                     break;
             }
+             */
 
             if (!FL_CMDLINE(flags))
                 newtPopWindow();
 
-            if (!(rc=doPwMount(devices[i]->device, location, "iso9660", "ro", NULL))) {
-                cddev = devices[i]->device;
+            if (!(rc=doPwMount(devwithpart, location, "iso9660", "ro", NULL))) {
+                //cddev = devices[i]->device;
+                cddev = devwithpart;
+                logMessage(INFO, "doPwMount rc: %i", rc);
+
                 if (!access(stage2loc, R_OK)) {
                     char *updpath;
 
+                    logMessage(INFO, "doPwMount, acces");
                     if (mediaCheck)
-                        queryCDMediaCheck(devices[i]->device, location);
+                        //queryCDMediaCheck(devices[i]->device, location);
+                        queryCDMediaCheck(devwithpart, location);
 
                     /* if in rescue mode lets copy stage 2 into RAM so we can */
                     /* free up the CD drive and user can have it avaiable to  */
@@ -391,6 +429,9 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
 			             * copy /mnt/stage2/images/install.img to
 			             * /tmp/install.img
 			             */
+                        logMessage(INFO, "copyFile: %s to /tm/install.img",
+                                stage2loc);
+
                         rc = copyFile(stage2loc, "/tmp/install.img");
                         stage2img = strdup("/tmp/install.img");
                         stage2inram = 1;
@@ -411,6 +452,9 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
                         continue;
                     }
 
+                    logMessage(INFO, "mounting stage2 done");
+
+                    umount(location);
                     if (asprintf(&updpath, "%s/images/updates.img", location) == -1) {
                         logMessage(CRITICAL, "%s: %d: %m", __func__, __LINE__);
                         abort();
@@ -441,6 +485,7 @@ static char *setupCdrom(char *location, struct loaderData_s *loaderData,
                         abort();
                     }
                 } else {
+                    logMessage(INFO, "doPwMount, unmounting");
                     /* this wasnt the CD we were looking for, clean up and */
                     /* try the next CD drive                               */
                     umount(location);

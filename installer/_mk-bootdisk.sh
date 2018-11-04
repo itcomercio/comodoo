@@ -960,7 +960,7 @@ INSTALL_BIN="awk bash cat checkisomd5 chmod cp cpio cut dd \
 df dhclient dmesg echo eject env grep ifconfig insmod mount.nfs \
 kill less ln ls mkdir mkfs.ext3 mknod modprobe more mount mv \
 rm rmmod route sed sfdisk sleep sort strace sync tree umount uniq \
-ps gdb netstat test less id systemctl chvt tty"
+ps gdb netstat test less id systemctl chvt tty free"
 
 INSTALL_SBIN="blockdev chroot dmsetup eject fdisk \
 insmod losetup lsmod mke2fs mkfs mkfs.ext2 mkfs.ext3 mkswap \
@@ -1150,25 +1150,25 @@ touch $MKB_DIR/etc/resolv.conf
 
 # FIXME: http://projects.gnome.org/NetworkManager/developers/api/09/ref-migrating.html
 # NetworkManager
-instbin / /usr/sbin/NetworkManager $MKB_DIR /usr/sbin/NetworkManager &>> ${LOGS_DIR}/initrd-population.log
-instbin / /usr/sbin/nm-system-settings $MKB_DIR /usr/sbin/nm-system-settings &>> ${LOGS_DIR}/initrd-population.log
-cp -a /etc/dbus-1/system.d/nm-*.conf $MKB_DIR/etc/dbus-1/system.d
-cp -a /etc/dbus-1/system.d/NetworkManager.conf $MKB_DIR/etc/dbus-1/system.d
-cp -a /etc/NetworkManager/nm-system-settings.conf $MKB_DIR/etc/NetworkManager
-( cd /usr/lib/NetworkManager
-      for f in *.so ; do
-          instbin / /usr/lib/NetworkManager/$f $MKB_DIR /usr/lib/NetworkManager/$f &>> ${LOGS_DIR}/initrd-population.log
-      done
-)
-( cd /usr/libexec
-      for f in nm-* ; do
-          instbin / /usr/libexec/$f $MKB_DIR /usr/libexec/$f &>> ${LOGS_DIR}/initrd-population.log
-      done
-)
-( cd /usr/share/dbus-1/system-services
-      cp -a org.freedesktop.NetworkManagerSystemSettings.service $MKB_DIR/usr/share/dbus-1/system-services
-      cp -a org.freedesktop.nm_dispatcher.service $MKB_DIR/usr/share/dbus-1/system-services
-)
+#instbin / /usr/sbin/NetworkManager $MKB_DIR /usr/sbin/NetworkManager &>> ${LOGS_DIR}/initrd-population.log
+#instbin / /usr/sbin/nm-system-settings $MKB_DIR /usr/sbin/nm-system-settings &>> ${LOGS_DIR}/initrd-population.log
+#cp -a /etc/dbus-1/system.d/nm-*.conf $MKB_DIR/etc/dbus-1/system.d
+#cp -a /etc/dbus-1/system.d/NetworkManager.conf $MKB_DIR/etc/dbus-1/system.d
+#cp -a /etc/NetworkManager/nm-system-settings.conf $MKB_DIR/etc/NetworkManager
+#( cd /usr/lib/NetworkManager
+#      for f in *.so ; do
+#          instbin / /usr/lib/NetworkManager/$f $MKB_DIR /usr/lib/NetworkManager/$f &>> ${LOGS_DIR}/initrd-population.log
+#      done
+#)
+#( cd /usr/libexec
+#      for f in nm-* ; do
+#          instbin / /usr/libexec/$f $MKB_DIR /usr/libexec/$f &>> ${LOGS_DIR}/initrd-population.log
+#      done
+#)
+#( cd /usr/share/dbus-1/system-services
+#      cp -a org.freedesktop.NetworkManagerSystemSettings.service $MKB_DIR/usr/share/dbus-1/system-services
+#      cp -a org.freedesktop.nm_dispatcher.service $MKB_DIR/usr/share/dbus-1/system-services
+#)
 
 echo_note "OK" "[OK]"
 
@@ -1189,18 +1189,14 @@ echo_note "OK" "[OK]"
 # Indirect dependencies: FIXME
 #install -m 755 /lib/libfreebl3.so $MKB_DIR/lib/
 #install -m 755 /lib/libsoftokn3.so $MKB_DIR/lib/
-
 #install -m 755 /usr/lib/libsqlite3.so.0 $MKB_DIR/usr/lib/
-install -m 755 /usr/lib/x86_64-linux-gnu/libsqlite3.so.0.8.6 $MKB_DIR/usr/lib/
-
+#install -m 755 /usr/lib/x86_64-linux-gnu/libsqlite3.so.0.8.6 $MKB_DIR/usr/lib/
 #install -m 755 /lib/libnss_dns.so.2 $MKB_DIR/lib/
-install -m 755 /lib/x86_64-linux-gnu/libnss_dns.so.2 $MKB_DIR/lib/
-
+#install -m 755 /lib/x86_64-linux-gnu/libnss_dns.so.2 $MKB_DIR/lib/
 #install -m 755 /lib/libnss_files.so.2 $MKB_DIR/lib/
-install -m 755 /lib/x86_64-linux-gnu/libnss_files.so.2 $MKB_DIR/lib/
-
+#install -m 755 /lib/x86_64-linux-gnu/libnss_files.so.2 $MKB_DIR/lib/
 #install -m 755 /lib/libgcc_s.so.1 $MKB_DIR/lib/
-install -m 755 /lib/x86_64-linux-gnu/libgcc_s.so.1 $MKB_DIR/lib/
+#install -m 755 /lib/x86_64-linux-gnu/libgcc_s.so.1 $MKB_DIR/lib/
 
 make_product_file $MKB_DIR
 
