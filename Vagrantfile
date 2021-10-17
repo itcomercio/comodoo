@@ -14,35 +14,10 @@ HOST_NAME = "builder"
 
 $provision = <<-SCRIPT
 echo "[PROVISIONER] Installing dependencies ..."
-sudo dnf group install "Development Tools" -y -q
-sudo dnf install audit-libs-devel \
-vim \
-git \
-isomd5sum-devel \
-squashfs-tools \
-e2fsprogs-devel \
-popt-devel \
-libblkid-devel \
-libX11-devel \
-libnl3-devel \
-newt-devel \
-device-mapper-devel \
-python \
-python-devel \
-zlib-devel \
-redhat-lsb-core \
-dmraid-devel \
-net-tools \
-nfs-utils \
-strace \
-tree \
-gdb \
-grub2-tools -y -q
-
+sudo dnf install -y -q git \
 echo "[PROVISIONER] Disabling SELINUX ..."
 sudo sed -i s/^SELINUX=.*$/SELINUX=permissive/ /etc/selinux/config
 sudo setenforce 0
-
 echo "[PROVISIONER] Done." 
 SCRIPT
 

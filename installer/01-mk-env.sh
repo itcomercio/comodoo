@@ -7,47 +7,40 @@ sudo dnf group install -y -q "Development Tools"
 echo_note "OK" "Packages installed!"
 
 echo_note "WARNING" "Installing Dependency packages"
-sudo dnf install -y -q audit-libs-devel \
-isomd5sum-devel \
-NetworkManager-devel \
-squashfs-tools \
-e2fsprogs-devel \
-popt-devel \
-libblkid-devel \
-libX11-devel \
-libnl3-devel \
-newt-devel \
-device-mapper-devel \
-python \
-python-devel \
-zlib-devel \
-redhat-lsb-core \
-dmraid-devel \
-net-tools \
-nfs-utils \
-strace \
-tree \
-gdb \
-grub2-tools \
-parted-devel \
-audit-libs-devel \
-e2fsprogs-devel \
-popt-devel \
-libblkid-devel \
-libnl3-devel \
-NetworkManager-glib-devel \
-device-mapper-devel \
-dmraid-devel \
-python2-dialog \
-dhcp-client \
-e2fsprogs \
-policycoreutils \
-genisoimage \
-python2-dbus \
-python2-pyparted \
-udisks2 \
-nasm \
-xorriso
+sudo dnf install -y -q \
+    audit-libs-devel \
+    isomd5sum-devel \
+    glib2-devel \
+    NetworkManager-libnm-devel \
+    squashfs-tools \
+    e2fsprogs-devel \
+    popt-devel \
+    libblkid-devel \
+    libX11-devel \
+    libnl3-devel \
+    newt-devel \
+    device-mapper-devel \
+    python \
+    python-devel \
+    zlib-devel \
+    redhat-lsb-core \
+    dmraid-devel \
+    net-tools \
+    nfs-utils \
+    strace \
+    tree \
+    vim \
+    gdb \
+    grub2-tools \
+    parted-devel \
+    python3-dialog
+    dhcp-client \
+    policycoreutils \
+    genisoimage \
+    python3-pyparted \
+    udisks2 \
+    nasm \
+    xorriso
 
 echo_note "OK" "Packages installed!"
 
