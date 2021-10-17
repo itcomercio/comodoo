@@ -49,7 +49,7 @@
 #include <netlink/route/link.h>
 
 #include <dbus/dbus.h>
-#include <NetworkManager.h>
+#include <libnm/NetworkManager.h> 
 
 #include "iface.h"
 #include "str.h"

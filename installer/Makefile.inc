@@ -24,7 +24,7 @@ SHELL = /bin/bash
 PYTHONLIBDIR = /usr/lib/anaconda
 RUNTIMEDIR = /usr/lib/anaconda-runtime
 ANACONDADATADIR = /usr/share/anaconda
-PYVER  := $(shell python -c 'import sys; print sys.version[0:3]')
+PYVER  := $(shell python -c 'import sys; print(sys.version[0:3])')
 PYTHON = python$(PYVER)
 PYTHONINCLUDE = /usr/include/$(PYTHON)
 

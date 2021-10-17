@@ -53,7 +53,7 @@ CFLAGS += $(shell pkg-config --cflags dbus-1)
 
 # isomd5sum
 LIBS   += -L../isomd5sum
-CFLAGS += -I../isomd5sum
+CFLAGS += -I../isomd5sum -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include -I/usr/include/libnm/
 
 
 ifeq (1, $(USESELINUX))

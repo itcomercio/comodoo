@@ -19,7 +19,7 @@
 
 include ../Makefile.inc
 
-CFLAGS +=  -I$(PYTHONINCLUDE) -I..
+CFLAGS +=  -I$(PYTHONINCLUDE) -I.. -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include -I/usr/include/libnm/
 
 OBJECTS = devices.o imount.o smp.o cpio.o uncpio.o dasd.o \
           lang.o isofs.o linkdetect.o vio.o \

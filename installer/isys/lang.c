@@ -26,6 +26,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/sysmacros.h>
 
 #include <linux/keyboard.h>
 #ifdef NR_KEYS

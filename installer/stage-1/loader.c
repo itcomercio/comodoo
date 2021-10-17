@@ -56,6 +56,8 @@
 #include <linux/serial.h>
 #include <linux/vt.h>
 
+#include <sys/sysmacros.h>
+
 #ifdef USE_MTRACE
 #include <mcheck.h>
 #endif
@@ -1720,14 +1722,16 @@ void loaderSegvHandler(int signum) {
     };
 
     /* XXX This should really be in a glibc header somewhere... */
-    extern const char *const sys_sigabbrev[NSIG];
+    /* JAVI extern const char *const sys_sigabbrev[NSIG]; */
 
     signal(signum, SIG_DFL); /* back to default */
 
     newtFinished();
     i = write(STDERR_FILENO, errmsgs[0], strlen(errmsgs[0]));
+    /* JAVI
     i = write(STDERR_FILENO, sys_sigabbrev[signum],
             strlen(sys_sigabbrev[signum]));
+    */
     i = write(STDERR_FILENO, errmsgs[1], strlen(errmsgs[1]));
 
     i = backtrace (array, 30);

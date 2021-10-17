@@ -37,7 +37,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <dbus/dbus.h>
-#include <NetworkManager.h>
+#include <libnm/NetworkManager.h>
 
 #include "../isys/isys.h"
 #include "../isys/ethtool.h"
@@ -1990,7 +1990,8 @@ int get_connection(iface_t *iface) {
         }
 
         dbus_message_iter_get_basic(&variant_iter, &state);
-        if (state == NM_STATE_CONNECTED) {
+        /*if (state == NM_STATE_CONNECTED) {*/
+        if (state == NM_STATE_CONNECTING ) {
             logMessage(INFO, "%s (%d): NetworkManager connected",
                        __func__, __LINE__);
             dbus_message_unref(message);
