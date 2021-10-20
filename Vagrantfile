@@ -6,15 +6,13 @@ VAGRANTFILE_API_VERSION = "2"
 # Tested with Vagrant version:
 Vagrant.require_version ">= 1.7.2"
 
-BOX       =  "fedora/34-cloud-base"
+BOX       = "fedora/34-cloud-base"
 CPU       = 4
 MEM       = 8192
 VM_NAME   = "builder"
 HOST_NAME = "builder"
 
 $provision = <<-SCRIPT
-echo "[PROVISIONER] Installing dependencies ..."
-sudo dnf install -y -q git \
 echo "[PROVISIONER] Disabling SELINUX ..."
 sudo sed -i s/^SELINUX=.*$/SELINUX=permissive/ /etc/selinux/config
 sudo setenforce 0
